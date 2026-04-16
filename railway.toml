@@ -1,0 +1,6 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "pip install -r bot_requirements.txt && python bot.py"
+restartPolicyType = "always"
