@@ -2,5 +2,5 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "pip3 install -r bot_requirements.txt && python3 bot.py"
+startCommand = "python3 bot.py"
 restartPolicyType = "always"
