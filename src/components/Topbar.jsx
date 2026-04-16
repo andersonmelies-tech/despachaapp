@@ -31,7 +31,7 @@ export default function Topbar({ tab, setTab, user, onLogout }) {
       </div>
 
       <div className="topbar-right">
-        <div className="user-info" onClick={onLogout} title="Clique para sair">
+        <div className="user-info">
           👤 {user?.username || user?.name || 'usuário'}
           {user?.role && (
             <span className={`role-badge ${user.role}`} style={{ marginLeft: '.3rem' }}>
@@ -39,6 +39,9 @@ export default function Topbar({ tab, setTab, user, onLogout }) {
             </span>
           )}
         </div>
+        <button className="logout-btn" onClick={onLogout} title="Sair">
+          ⏻ Sair
+        </button>
       </div>
     </div>
   )
