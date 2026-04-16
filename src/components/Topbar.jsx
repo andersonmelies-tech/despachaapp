@@ -9,10 +9,13 @@ export default function Topbar({ tab, setTab, user, onLogout }) {
   return (
     <div className="topbar">
       <div className="brand">
-        <div className="brand-icon">🚀</div>
-        <div className="brand-name">DESPACHA</div>
-        <div className="brand-sep" />
-        <div className="brand-sub">Gestão de Serviços</div>
+        <div className="brand-logo">
+          <div className="brand-logo-icon">✈</div>
+          <div className="brand-text">
+            <div className="brand-name">DESPACHA<span>APP</span></div>
+            <div className="brand-sub">Gestão de Serviços</div>
+          </div>
+        </div>
       </div>
 
       <div className="topbar-tabs">
