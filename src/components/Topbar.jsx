@@ -10,11 +10,8 @@ export default function Topbar({ tab, setTab, user, onLogout }) {
     <div className="topbar">
       <div className="brand">
         <div className="brand-logo">
-          <div className="brand-logo-icon">✈</div>
-          <div className="brand-text">
-            <div className="brand-name">DESPACHA<span>APP</span></div>
-            <div className="brand-sub">Gestão de Serviços</div>
-          </div>
+          <img src="/icon.png" alt="DespachaApp" className="brand-logo-img" />
+          <img src="/logo.png" alt="DespachaApp" className="brand-logo-full" />
         </div>
       </div>
 

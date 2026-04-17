@@ -24,8 +24,8 @@ export default function Login({ onLogin, showToast }) {
     <div className="login-overlay">
       <div className="login-box">
         <div className="login-logo">
-          <div className="login-brand-icon">✈</div>
-          <div className="login-app-name">DESPACHA<span>APP</span></div>
+          <img src="/icon.png" alt="DespachaApp" className="login-icon-img" />
+          <img src="/logo.png" alt="DespachaApp" className="login-logo-img" />
           <div className="login-sub">Gerenciamento de Tarefas Ágil</div>
         </div>
         <form onSubmit={handleLogin}>
