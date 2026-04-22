@@ -3,6 +3,13 @@
 import os, sys, base64, io, json as _json
 from datetime import datetime
 
+try:
+    from PIL import Image as _PILImage
+    PIL_OK = True
+except ImportError:
+    PIL_OK = False
+    print("[BOT] Pillow não instalado — fotos sem compressão")
+
 for _s in (sys.stdout, sys.stderr):
     if _s and hasattr(_s, 'reconfigure'):
         try: _s.reconfigure(encoding='utf-8', errors='replace')
@@ -60,6 +67,12 @@ def sb_insert(table, data):
     if not sb: return None
     try: return sb.table(table).insert(data).execute().data
     except Exception as e: print(f"[sb_insert] {e}"); return None
+
+# ── Admin chat ────────────────────────────────────────────────────────────────
+def get_admin_chat_id():
+    row = sb_one("config", key="admin_chat_id")
+    cid = (row or {}).get("value", "").strip()
+    return cid if cid else os.environ.get("ADMIN_CHAT_ID", "").strip()
 
 # ── Token ─────────────────────────────────────────────────────────────────────
 def get_token():
@@ -147,6 +160,25 @@ def get_stats(chat_id):
         "avg_minutes": sum(t["elapsed_minutes"] for t in gfin) // len(gfin) if gfin else None,
     }
     return prov, mine, geral
+
+# ── Compressão de imagem ──────────────────────────────────────────────────────
+def compress_photo(img_bytes, max_px=800, quality=62):
+    """Redimensiona para max_px e recodifica em JPEG economizando espaço no banco."""
+    if not PIL_OK:
+        return img_bytes
+    try:
+        img = _PILImage.open(io.BytesIO(img_bytes))
+        if img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
+        img.thumbnail((max_px, max_px), _PILImage.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=quality, optimize=True)
+        compressed = buf.getvalue()
+        print(f"[compress] {len(img_bytes)//1024}KB → {len(compressed)//1024}KB")
+        return compressed
+    except Exception as e:
+        print(f"[compress_photo] {e}")
+        return img_bytes
 
 # ── Estado de espera ──────────────────────────────────────────────────────────
 _waiting = {}
@@ -526,7 +558,26 @@ async def text_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("👁 Ver tarefa",  callback_data=f"view:{tid}"),
-                InlineKeyboardButton("🏠 Menu",        callback_data="menu")]])); return
+                InlineKeyboardButton("🏠 Menu",        callback_data="menu")]]))
+        # Notifica admin
+        admin_cid = get_admin_chat_id()
+        if admin_cid:
+            urg = URG.get(task.get("urgency",""), "")
+            try:
+                await ctx.bot.send_message(
+                    chat_id=int(admin_cid),
+                    text=(
+                        f"⚠️ *Nova data aguarda autorização!*\n\n"
+                        f"{urg} *#{tid}* — {task['title']}\n"
+                        f"👤 Prestador: *{name}*\n"
+                        f"📅 Data atual: *{fmt_date(task.get('due_date',''))}*\n"
+                        f"📅 Data proposta: *{raw}*\n\n"
+                        f"_Acesse o sistema para aprovar ou recusar._"
+                    ),
+                    parse_mode="Markdown")
+            except Exception as e:
+                print(f"[notify_admin] {e}")
+        return
 
     await start(update, ctx)
 
@@ -551,7 +602,7 @@ async def photo_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         tg_file   = await ctx.bot.get_file(photo_obj.file_id)
         buf = io.BytesIO()
         await tg_file.download_to_memory(buf)
-        img_bytes = buf.getvalue()
+        img_bytes = compress_photo(buf.getvalue())
 
         # Converte para base64
         b64      = base64.b64encode(img_bytes).decode()
@@ -591,6 +642,48 @@ async def photo_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         print(f"[photo_handler] erro: {e}")
         await update.message.reply_text(f"❌ Erro ao processar foto: {e}")
 
+async def notify_new_tasks(ctx: ContextTypes.DEFAULT_TYPE):
+    """Job periódico: notifica prestadores sobre tarefas recém-atribuídas."""
+    if not sb: return
+    try:
+        r = (sb.table("tasks").select("*")
+             .eq("provider_notified", False)
+             .not_.in_("status", ["cancelada"])
+             .execute())
+        tasks = r.data or []
+        for task in tasks:
+            # Marca notificado primeiro para não re-tentar em caso de erro
+            sb_update("tasks", {"provider_notified": True}, id=task["id"])
+            if not task.get("assignee_id"):
+                continue
+            prov = sb_one("providers", id=task["assignee_id"])
+            if not prov or not prov.get("chat_id"):
+                continue
+            urg = URG.get(task.get("urgency", ""), "")
+            sla = fmt_date(task.get("sla_deadline", ""))
+            msg = (
+                f"🔔 *Nova tarefa atribuída a você!*\n\n"
+                f"{urg} *#{task['id']}* — {task['title']}\n\n"
+                f"📝 {task.get('description') or '–'}\n"
+                f"👤 Solicitante: {task.get('requester', '')}\n"
+                f"🏢 Setor: {task.get('sector') or '–'}\n"
+                f"⏱ *Conclusão prevista (SLA):* {sla}\n\n"
+                f"_Use o menu abaixo para ver detalhes e iniciar a tarefa._"
+            )
+            kb = InlineKeyboardMarkup([[
+                InlineKeyboardButton("👁 Ver Tarefa", callback_data=f"view:{task['id']}"),
+                InlineKeyboardButton("🏠 Menu",       callback_data="menu"),
+            ]])
+            try:
+                await ctx.bot.send_message(
+                    chat_id=int(prov["chat_id"]),
+                    text=msg, parse_mode="Markdown", reply_markup=kb)
+                print(f"[notify] Tarefa #{task['id']} → {prov['name']}")
+            except Exception as e:
+                print(f"[notify] Erro ao notificar {prov.get('name')}: {e}")
+    except Exception as e:
+        print(f"[notify_new_tasks] {e}")
+
 async def cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     clear_wait(str(update.effective_chat.id))
     await update.effective_message.reply_text("Cancelado. Use /start para recomeçar.")
@@ -611,6 +704,8 @@ def run_bot():
     app.add_handler(CallbackQueryHandler(button))
     app.add_handler(MessageHandler(filters.PHOTO,                       photo_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,     text_handler))
+    # Job: verifica novas tarefas e notifica prestadores a cada 30s
+    app.job_queue.run_repeating(notify_new_tasks, interval=30, first=10)
     print("[BOT] Rodando.")
     app.run_polling(bootstrap_retries=-1, drop_pending_updates=True)
 

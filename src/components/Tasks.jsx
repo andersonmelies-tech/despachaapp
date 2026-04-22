@@ -63,12 +63,26 @@ function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave }) {
   async function addPhotos(files) {
     const newPhotos = []
     for (const file of files) {
-      const b64 = await new Promise(res => {
-        const r = new FileReader()
-        r.onload = e => res(e.target.result)
-        r.readAsDataURL(file)
+      const compressed = await new Promise(resolve => {
+        const img = new Image()
+        const url = URL.createObjectURL(file)
+        img.onload = () => {
+          const MAX = 800
+          let { width, height } = img
+          if (width > MAX || height > MAX) {
+            if (width >= height) { height = Math.round(height * MAX / width); width = MAX }
+            else { width = Math.round(width * MAX / height); height = MAX }
+          }
+          const canvas = document.createElement('canvas')
+          canvas.width = width; canvas.height = height
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+          URL.revokeObjectURL(url)
+          resolve(canvas.toDataURL('image/jpeg', 0.65))
+        }
+        img.onerror = () => { URL.revokeObjectURL(url); resolve(null) }
+        img.src = url
       })
-      newPhotos.push(b64)
+      if (compressed) newPhotos.push(compressed)
     }
     setF(prev => ({ ...prev, photos: [...prev.photos, ...newPhotos] }))
   }
