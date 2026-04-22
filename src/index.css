@@ -254,6 +254,41 @@ textarea.finput { resize: vertical; min-height: 80px; }
 .cal-task-chip.baixa    { background: var(--green); color: #000; }
 .cal-task-chip.concluida { background: var(--s3); color: var(--muted); text-decoration: line-through; }
 
+/* ── PENDING DATES PANEL ──────────────────────────────── */
+.pending-dates-panel {
+  background: #F57E220a; border: 1px solid #F57E2255;
+  border-left: 4px solid var(--orange);
+  border-radius: var(--radius); padding: .9rem 1.1rem;
+  margin-bottom: 1.25rem;
+}
+.pending-dates-title {
+  display: flex; align-items: center; gap: .6rem;
+  font-size: .82rem; font-weight: 700; color: var(--orange);
+  margin-bottom: .75rem; letter-spacing: .01em;
+}
+.pending-dates-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--orange);
+  animation: pulse 1.6s infinite;
+  flex-shrink: 0;
+}
+.pending-date-row {
+  display: flex; align-items: center; gap: .85rem;
+  padding: .6rem 0; border-top: 1px solid #F57E2222;
+  flex-wrap: wrap;
+}
+.pending-date-info { display: flex; align-items: center; gap: .55rem; flex: 1; min-width: 180px; }
+.pending-date-id   { font-family: var(--mono); font-size: .75rem; color: var(--dim); flex-shrink: 0; }
+.pending-date-title    { font-size: .85rem; font-weight: 600; }
+.pending-date-provider { font-size: .75rem; color: var(--muted); flex-shrink: 0; }
+.pending-date-dates {
+  display: flex; align-items: center; gap: .4rem;
+  font-family: var(--mono); font-size: .8rem; flex-shrink: 0;
+}
+.pending-date-old { color: var(--dim); text-decoration: line-through; }
+.pending-date-new { color: var(--orange); font-weight: 700; }
+.pending-date-actions { display: flex; gap: .4rem; flex-shrink: 0; }
+
 /* ── PROVIDER FEEDBACK ────────────────────────────────── */
 .flabel-hint { font-size: .65rem; color: var(--blue); font-style: italic; text-transform: none; letter-spacing: 0; font-weight: 400; }
 

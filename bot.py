@@ -559,24 +559,6 @@ async def text_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("👁 Ver tarefa",  callback_data=f"view:{tid}"),
                 InlineKeyboardButton("🏠 Menu",        callback_data="menu")]]))
-        # Notifica admin
-        admin_cid = get_admin_chat_id()
-        if admin_cid:
-            urg = URG.get(task.get("urgency",""), "")
-            try:
-                await ctx.bot.send_message(
-                    chat_id=int(admin_cid),
-                    text=(
-                        f"⚠️ *Nova data aguarda autorização!*\n\n"
-                        f"{urg} *#{tid}* — {task['title']}\n"
-                        f"👤 Prestador: *{name}*\n"
-                        f"📅 Data atual: *{fmt_date(task.get('due_date',''))}*\n"
-                        f"📅 Data proposta: *{raw}*\n\n"
-                        f"_Acesse o sistema para aprovar ou recusar._"
-                    ),
-                    parse_mode="Markdown")
-            except Exception as e:
-                print(f"[notify_admin] {e}")
         return
 
     await start(update, ctx)
