@@ -8,6 +8,7 @@ import Tasks    from './components/Tasks.jsx'
 import Calendar from './components/Calendar.jsx'
 import Settings from './components/Settings.jsx'
 import Toast    from './components/Toast.jsx'
+import MobileNav from './components/MobileNav.jsx'
 
 export default function App() {
   const [session,     setSession]     = useState(null)
@@ -71,6 +72,7 @@ export default function App() {
         </div>
       </div>
 
+      <MobileNav tab={tab} setTab={handleSetTab} stats={stats} />
       <Toast msg={toast.msg} type={toast.type} visible={toast.visible} />
     </>
   )
