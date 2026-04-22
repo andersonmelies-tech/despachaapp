@@ -82,13 +82,18 @@ function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave }) {
     const now = new Date()
     const sla_deadline = isEdit ? task.sla_deadline : calcSlaDeadline(f.urgency, now)
 
+    // Quando criando, se nenhuma data de prazo foi informada, usa a data do SLA
+    const resolvedDueDate = f.due_date
+      ? f.due_date
+      : (!isEdit ? sla_deadline.split('T')[0] : null)
+
     const payload = {
       title: f.title, description: f.description,
       requester: f.requester, requester_sector: f.requester_sector,
       assignee_id: f.assignee_id || null, assignee: f.assignee,
       urgency: f.urgency, status: f.status,
       category: f.category, sector: f.sector,
-      due_date: f.due_date || null,
+      due_date: resolvedDueDate,
       sla_deadline: isEdit ? task.sla_deadline : sla_deadline,
       notes: f.notes,
       photos: f.photos.length ? JSON.stringify(f.photos) : null,
@@ -181,7 +186,7 @@ function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave }) {
               <input className="finput" placeholder="Elétrica, Hidráulica…" value={f.category} onChange={e => set('category', e.target.value)} />
             </div>
             <div className="fg">
-              <label className="flabel">PRAZO</label>
+              <label className="flabel">PRAZO (DATA DE CONCLUSÃO){!isEdit && <span className="flabel-hint"> — padrão: SLA</span>}</label>
               <input className="finput" type="date" value={f.due_date} onChange={e => set('due_date', e.target.value)} />
             </div>
             <div className="fg">
@@ -248,6 +253,37 @@ function TaskDetail({ task: initialTask, onClose, onUpdate, showToast }) {
     supabase.from('providers').select('*').eq('active', 1).then(r => setProviders(r.data || []))
     supabase.from('sectors').select('*').eq('active', 1).order('name').then(r => setSectors(r.data || []))
   }, [task.id])
+
+  async function approveNewDate() {
+    const { data, error } = await supabase.from('tasks')
+      .update({ due_date: task.provider_new_date, provider_new_date: null })
+      .eq('id', task.id).select().single()
+    if (error) { showToast('Erro ao aprovar data', 'err'); return }
+    await supabase.from('task_history').insert({
+      task_id: task.id, action: 'due_date',
+      old_value: task.due_date || '–',
+      new_value: task.provider_new_date,
+      changed_by: 'web'
+    })
+    setTask(data)
+    onUpdate()
+    showToast('Nova data de conclusão aprovada ✓')
+  }
+
+  async function rejectNewDate() {
+    const { data, error } = await supabase.from('tasks')
+      .update({ provider_new_date: null })
+      .eq('id', task.id).select().single()
+    if (error) { showToast('Erro ao recusar data', 'err'); return }
+    await supabase.from('task_history').insert({
+      task_id: task.id, action: 'provider_new_date',
+      old_value: task.provider_new_date,
+      new_value: 'recusado',
+      changed_by: 'web'
+    })
+    setTask(data)
+    showToast('Nova data recusada')
+  }
 
   async function changeStatus(newStatus) {
     const now = new Date().toISOString()
@@ -325,6 +361,31 @@ function TaskDetail({ task: initialTask, onClose, onUpdate, showToast }) {
             {task.elapsed_minutes && <span className="chip green">⏱ {fmtMin(task.elapsed_minutes)}</span>}
           </div>
           {task.notes && <div style={{ marginBottom: '.85rem' }}><div className="dlabel">OBSERVAÇÕES</div><div className="dval">{task.notes}</div></div>}
+
+          {/* Observações do Prestador (via Telegram) */}
+          {task.provider_obs && (
+            <div style={{ marginBottom: '.85rem' }}>
+              <div className="dlabel">💬 OBSERVAÇÕES DO PRESTADOR</div>
+              <div className="provider-obs-box">{task.provider_obs}</div>
+            </div>
+          )}
+
+          {/* Nova Data Proposta pelo Prestador */}
+          {task.provider_new_date && (
+            <div style={{ marginBottom: '.85rem' }}>
+              <div className="dlabel">📅 NOVA DATA PROPOSTA PELO PRESTADOR</div>
+              <div className="provider-newdate-box">
+                <div className="provider-newdate-info">
+                  <span className="provider-newdate-val">{fmtDate(task.provider_new_date)}</span>
+                  <span className="provider-newdate-caption">O prestador solicitou alteração do prazo de conclusão</span>
+                </div>
+                <div className="provider-newdate-actions">
+                  <button className="btn-approve" onClick={approveNewDate}>✓ Aprovar</button>
+                  <button className="btn-reject"  onClick={rejectNewDate}>✕ Recusar</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Fotos */}
           {task.photos && (() => {
@@ -495,7 +556,11 @@ export default function Tasks({ showToast, sideFilter, user }) {
               <span className="tid">#{t.id}</span>
               <span>
                 <div className="ttitle">{t.title}
-                  <small>{t.requester} {t.sector && `· ${t.sector}`}</small>
+                  <small>
+                    {t.requester} {t.sector && `· ${t.sector}`}
+                    {t.provider_new_date && <span className="pnd-badge" title="Prestador propôs nova data"> 📅</span>}
+                    {t.provider_obs      && <span className="pnd-badge" title="Prestador adicionou observação"> 💬</span>}
+                  </small>
                 </div>
               </span>
               <span className="tassignee">{t.assignee}</span>

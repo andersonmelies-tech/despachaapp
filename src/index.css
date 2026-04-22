@@ -254,6 +254,47 @@ textarea.finput { resize: vertical; min-height: 80px; }
 .cal-task-chip.baixa    { background: var(--green); color: #000; }
 .cal-task-chip.concluida { background: var(--s3); color: var(--muted); text-decoration: line-through; }
 
+/* ── PROVIDER FEEDBACK ────────────────────────────────── */
+.flabel-hint { font-size: .65rem; color: var(--blue); font-style: italic; text-transform: none; letter-spacing: 0; font-weight: 400; }
+
+.provider-obs-box {
+  background: #3296EE0f; border: 1px solid #3296EE33;
+  border-left: 3px solid var(--blue);
+  border-radius: var(--radius-sm); padding: .75rem 1rem;
+  font-size: .88rem; line-height: 1.6; white-space: pre-wrap;
+  color: var(--text);
+}
+
+.provider-newdate-box {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  background: #F57E220f; border: 1px solid #F57E2233;
+  border-left: 3px solid var(--orange);
+  border-radius: var(--radius-sm); padding: .75rem 1rem;
+  flex-wrap: wrap;
+}
+.provider-newdate-info { display: flex; flex-direction: column; gap: .2rem; }
+.provider-newdate-val  { font-family: var(--mono); font-size: 1.05rem; font-weight: 700; color: var(--orange); }
+.provider-newdate-caption { font-size: .76rem; color: var(--muted); }
+.provider-newdate-actions { display: flex; gap: .5rem; }
+
+.btn-approve {
+  background: linear-gradient(135deg,var(--green),#00b87a); color: #000;
+  border: none; padding: .42rem 1rem; font-family: var(--sans); font-size: .82rem;
+  font-weight: 700; cursor: pointer; border-radius: var(--radius-sm);
+  transition: all .15s; box-shadow: 0 2px 8px #00d48a33;
+}
+.btn-approve:hover { filter: brightness(1.12); transform: translateY(-1px); }
+
+.btn-reject {
+  background: none; border: 1px solid var(--red); color: var(--red);
+  padding: .42rem .9rem; font-family: var(--sans); font-size: .82rem;
+  font-weight: 600; cursor: pointer; border-radius: var(--radius-sm);
+  transition: all .12s;
+}
+.btn-reject:hover { background: var(--red); color: #fff; }
+
+.pnd-badge { font-size: .78rem; cursor: help; }
+
 /* ── PHOTOS ───────────────────────────────────────────── */
 .photo-upload-area { border: 2px dashed var(--border); border-radius: var(--radius); padding: 1.2rem; text-align: center; cursor: pointer; transition: border-color .15s; background: var(--s2); margin-top: .4rem; }
 .photo-upload-area:hover { border-color: var(--blue); }
