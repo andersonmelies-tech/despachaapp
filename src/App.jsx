@@ -10,22 +10,19 @@ import Settings from './components/Settings.jsx'
 import Toast from './components/Toast.jsx'
 
 export default function App() {
-  const [session, setSession] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('dashboard')
+  const [session, setSession]     = useState(null)
+  const [loading, setLoading]     = useState(true)
+  const [tab, setTab]             = useState('dashboard')
   const [sideFilter, setSideFilter] = useState('all')
-  const [toast, setToast] = useState({ msg: '', type: '', visible: false })
-  const [stats, setStats] = useState(null)
-  const [tasksKey, setTasksKey] = useState(0) // força re-render do Tasks
+  const [toast, setToast]         = useState({ msg: '', type: '', visible: false })
+  const [stats, setStats]         = useState(null)
+  const [tasksKey, setTasksKey]   = useState(0)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setLoading(false)
+      setSession(session); setLoading(false)
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
-      setSession(s)
-    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
     return () => subscription.unsubscribe()
   }, [])
 
@@ -34,16 +31,15 @@ export default function App() {
     setTimeout(() => setToast(t => ({ ...t, visible: false })), 3200)
   }, [])
 
-  const refreshTasks = useCallback(() => setTasksKey(k => k + 1), [])
-
   const handleSideFilter = (f) => {
     setSideFilter(f)
     setTab('tasks')
   }
 
   if (loading) return (
-    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.8rem' }}>
-      carregando...
+    <div className="loading-screen">
+      <img src="/icon.png" alt="" style={{ width: 48, borderRadius: 12, marginBottom: '.75rem', opacity: .7 }} />
+      <span>Carregando…</span>
     </div>
   )
 
@@ -51,41 +47,31 @@ export default function App() {
 
   const user = session.user
   const meta = user.user_metadata || {}
+  const hasSidebar = tab === 'tasks'
 
   return (
     <>
-      <Topbar
-        tab={tab} setTab={setTab}
-        user={meta}
-        onLogout={() => supabase.auth.signOut()}
-      />
-      <div className="layout">
-        <Sidebar
-          tab={tab} setTab={setTab}
-          sideFilter={sideFilter} setSideFilter={handleSideFilter}
-          stats={stats}
-        />
+      <Topbar tab={tab} setTab={t => { setTab(t); if (t !== 'tasks') setSideFilter('all') }} user={meta} onLogout={() => supabase.auth.signOut()} />
+
+      <div className={`layout${hasSidebar ? '' : ' no-sidebar'}`}>
+
+        {hasSidebar && (
+          <Sidebar
+            sideFilter={sideFilter}
+            setSideFilter={handleSideFilter}
+            stats={stats}
+          />
+        )}
+
         <div className="main">
-          {tab === 'dashboard' && (
-            <Dashboard showToast={showToast} onStatsLoaded={setStats} refreshTasks={refreshTasks} />
-          )}
-          {tab === 'tasks' && (
-            <Tasks
-              key={tasksKey}
-              showToast={showToast}
-              sideFilter={sideFilter}
-              user={meta}
-              onStatsChange={() => setTasksKey(k => k + 1)}
-            />
-          )}
-          {tab === 'calendar' && (
-            <Calendar showToast={showToast} />
-          )}
-          {tab === 'settings' && (
-            <Settings showToast={showToast} user={meta} session={session} />
-          )}
+          {tab === 'dashboard' && <Dashboard showToast={showToast} onStatsLoaded={setStats} />}
+          {tab === 'tasks'     && <Tasks key={tasksKey} showToast={showToast} sideFilter={sideFilter} user={meta} onStatsChange={() => setTasksKey(k => k + 1)} />}
+          {tab === 'calendar'  && <Calendar showToast={showToast} />}
+          {tab === 'settings'  && <Settings showToast={showToast} user={meta} session={session} />}
         </div>
+
       </div>
+
       <Toast msg={toast.msg} type={toast.type} visible={toast.visible} />
     </>
   )
