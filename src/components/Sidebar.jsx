@@ -1,46 +1,67 @@
-export default function Sidebar({ sideFilter, setSideFilter, stats }) {
-  const s = stats || {}
+const NAV_ITEMS = [
+  { id: 'dashboard', label: 'Dashboard',  icon: '▦' },
+  { id: 'tasks',     label: 'Tarefas',    icon: '≡' },
+  { id: 'calendar',  label: 'Agenda',     icon: '▦' },
+  { id: 'settings',  label: 'Config',     icon: '⚙' },
+]
 
-  const filters = [
-    { id: 'all',          label: 'Todas as tarefas', icon: '≡',  badge: s.total,        cls: '' },
-    { id: 'pendente',     label: 'Pendentes',         icon: '⏳', badge: s.pendente,     cls: 'bd-warn' },
-    { id: 'em_andamento', label: 'Em andamento',      icon: '▶',  badge: s.em_andamento, cls: 'bd-blue' },
-    { id: 'concluida',    label: 'Concluídas',        icon: '✓',  badge: s.concluida,    cls: 'bd-green' },
-    { id: 'atrasadas',    label: 'Atrasadas',         icon: '!',  badge: s.atrasadas,    cls: 'bd-red' },
-    { id: 'criticas',     label: 'Críticas',          icon: '⚠',  badge: s.criticas,     cls: 'bd-red' },
-  ]
+const FILTERS = [
+  { id: 'all',          label: 'Todas',        icon: '≡',  statKey: 'total',        cls: '' },
+  { id: 'pendente',     label: 'Pendentes',    icon: '⏳', statKey: 'pendente',     cls: 'bd-warn' },
+  { id: 'em_andamento', label: 'Em andamento', icon: '▶',  statKey: 'em_andamento', cls: 'bd-blue' },
+  { id: 'concluida',    label: 'Concluídas',   icon: '✓',  statKey: 'concluida',    cls: 'bd-green' },
+  { id: 'atrasadas',    label: 'Atrasadas',    icon: '!',  statKey: 'atrasadas',    cls: 'bd-red' },
+  { id: 'criticas',     label: 'Críticas',     icon: '⚠',  statKey: 'criticas',     cls: 'bd-red' },
+]
+
+export default function Sidebar({ tab, setTab, sideFilter, setSideFilter, stats }) {
+  const s = stats || {}
+  const isTasksTab = tab === 'tasks'
 
   return (
     <aside className="sidebar">
 
-      <div className="sb-header">
-        <span className="sb-header-title">Filtros</span>
-        {sideFilter !== 'all' && (
-          <button className="sb-clear" onClick={() => setSideFilter('all')} title="Limpar filtro">✕</button>
-        )}
-      </div>
-
-      <div className="sb-filters">
-        {filters.map(f => (
+      {/* ── Navegação ── */}
+      <div className="sb-section">
+        <div className="sb-section-label">Navegação</div>
+        {NAV_ITEMS.map(item => (
           <div
-            key={f.id}
-            className={`sb-item${sideFilter === f.id ? ' active' : ''}`}
-            onClick={() => setSideFilter(f.id)}
+            key={item.id}
+            className={`sb-item${tab === item.id ? ' active' : ''}`}
+            onClick={() => setTab(item.id)}
           >
-            <span className="sb-icon">{f.icon}</span>
-            <span className="sb-label-text">{f.label}</span>
-            {f.badge != null && (
-              <span className={`badge${f.cls ? ' ' + f.cls : ''}`}>{f.badge}</span>
+            <span className="sb-icon">{item.icon}</span>
+            <span className="sb-label-text">{item.label}</span>
+            {/* Badge de atrasadas no item Tarefas */}
+            {item.id === 'tasks' && s.atrasadas > 0 && (
+              <span className="badge bd-red">{s.atrasadas}</span>
             )}
           </div>
         ))}
       </div>
 
-      {/* Mini stats */}
-      {s.atrasadas > 0 && (
-        <div className="sb-alert">
-          <span className="sb-alert-icon">⚠</span>
-          <span>{s.atrasadas} tarefa{s.atrasadas > 1 ? 's' : ''} atrasada{s.atrasadas > 1 ? 's' : ''}</span>
+      {/* ── Filtros (só na aba Tarefas) ── */}
+      {isTasksTab && (
+        <div className="sb-section">
+          <div className="sb-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Filtros</span>
+            {sideFilter !== 'all' && (
+              <button className="sb-clear" onClick={() => setSideFilter('all')}>✕ limpar</button>
+            )}
+          </div>
+          {FILTERS.map(f => (
+            <div
+              key={f.id}
+              className={`sb-item sb-filter${sideFilter === f.id ? ' active' : ''}`}
+              onClick={() => setSideFilter(f.id)}
+            >
+              <span className="sb-icon">{f.icon}</span>
+              <span className="sb-label-text">{f.label}</span>
+              {s[f.statKey] != null && (
+                <span className={`badge${f.cls ? ' ' + f.cls : ''}`}>{s[f.statKey]}</span>
+              )}
+            </div>
+          ))}
         </div>
       )}
 

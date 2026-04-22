@@ -71,9 +71,12 @@ function ProvidersPanel({ showToast }) {
   }
 
   async function del(id) {
-    if (!confirm('Excluir prestador?')) return
-    await supabase.from('providers').delete().eq('id', id)
-    showToast('Prestador excluído'); load()
+    if (!confirm('Desativar este prestador? As tarefas vinculadas serão preservadas.')) return
+    // Soft delete: marca como inativo (não deleta para preservar histórico de tarefas)
+    const { error } = await supabase.from('providers').update({ active: 0 }).eq('id', id)
+    if (error) { showToast('Erro ao remover prestador: ' + error.message, 'err'); return }
+    showToast('Prestador desativado ✓')
+    load()
   }
 
   return (

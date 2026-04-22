@@ -1,22 +1,22 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from './lib/supabase.js'
-import Login from './components/Login.jsx'
-import Topbar from './components/Topbar.jsx'
-import Sidebar from './components/Sidebar.jsx'
+import Login    from './components/Login.jsx'
+import Topbar   from './components/Topbar.jsx'
+import Sidebar  from './components/Sidebar.jsx'
 import Dashboard from './components/Dashboard.jsx'
-import Tasks from './components/Tasks.jsx'
+import Tasks    from './components/Tasks.jsx'
 import Calendar from './components/Calendar.jsx'
 import Settings from './components/Settings.jsx'
-import Toast from './components/Toast.jsx'
+import Toast    from './components/Toast.jsx'
 
 export default function App() {
-  const [session, setSession]     = useState(null)
-  const [loading, setLoading]     = useState(true)
-  const [tab, setTab]             = useState('dashboard')
-  const [sideFilter, setSideFilter] = useState('all')
-  const [toast, setToast]         = useState({ msg: '', type: '', visible: false })
-  const [stats, setStats]         = useState(null)
-  const [tasksKey, setTasksKey]   = useState(0)
+  const [session,     setSession]     = useState(null)
+  const [loading,     setLoading]     = useState(true)
+  const [tab,         setTab]         = useState('dashboard')
+  const [sideFilter,  setSideFilter]  = useState('all')
+  const [toast,       setToast]       = useState({ msg: '', type: '', visible: false })
+  const [stats,       setStats]       = useState(null)
+  const [tasksKey,    setTasksKey]    = useState(0)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -30,6 +30,11 @@ export default function App() {
     setToast({ msg, type, visible: true })
     setTimeout(() => setToast(t => ({ ...t, visible: false })), 3200)
   }, [])
+
+  const handleSetTab = (t) => {
+    setTab(t)
+    if (t !== 'tasks') setSideFilter('all')
+  }
 
   const handleSideFilter = (f) => {
     setSideFilter(f)
@@ -45,23 +50,18 @@ export default function App() {
 
   if (!session) return <Login onLogin={s => setSession(s)} showToast={showToast} />
 
-  const user = session.user
-  const meta = user.user_metadata || {}
-  const hasSidebar = tab === 'tasks'
+  const meta = session.user?.user_metadata || {}
 
   return (
     <>
-      <Topbar tab={tab} setTab={t => { setTab(t); if (t !== 'tasks') setSideFilter('all') }} user={meta} onLogout={() => supabase.auth.signOut()} />
+      <Topbar user={meta} onLogout={() => supabase.auth.signOut()} />
 
-      <div className={`layout${hasSidebar ? '' : ' no-sidebar'}`}>
-
-        {hasSidebar && (
-          <Sidebar
-            sideFilter={sideFilter}
-            setSideFilter={handleSideFilter}
-            stats={stats}
-          />
-        )}
+      <div className="layout">
+        <Sidebar
+          tab={tab}         setTab={handleSetTab}
+          sideFilter={sideFilter} setSideFilter={handleSideFilter}
+          stats={stats}
+        />
 
         <div className="main">
           {tab === 'dashboard' && <Dashboard showToast={showToast} onStatsLoaded={setStats} />}
@@ -69,7 +69,6 @@ export default function App() {
           {tab === 'calendar'  && <Calendar showToast={showToast} />}
           {tab === 'settings'  && <Settings showToast={showToast} user={meta} session={session} />}
         </div>
-
       </div>
 
       <Toast msg={toast.msg} type={toast.type} visible={toast.visible} />
