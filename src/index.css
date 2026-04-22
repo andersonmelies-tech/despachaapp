@@ -253,6 +253,18 @@ textarea.finput { resize: vertical; min-height: 80px; }
 .cal-task-chip.media    { background: var(--blue);  color: #fff; }
 .cal-task-chip.baixa    { background: var(--green); color: #000; }
 .cal-task-chip.concluida { background: var(--s3); color: var(--muted); text-decoration: line-through; }
+.cal-task-chip:hover { filter: brightness(1.15); }
+
+.cal-task-row {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .6rem .5rem; border-bottom: 1px solid var(--border);
+  cursor: pointer; border-radius: var(--radius-sm); transition: background .12s;
+}
+.cal-task-row:last-child { border-bottom: none; }
+.cal-task-row:hover { background: var(--s2); }
+.cal-task-row-id   { font-family: var(--mono); font-size: .72rem; color: var(--dim); flex-shrink: 0; }
+.cal-task-row-open { font-size: .72rem; color: var(--blue); flex-shrink: 0; opacity: 0; transition: opacity .12s; }
+.cal-task-row:hover .cal-task-row-open { opacity: 1; }
 
 /* ── PENDING DATES PANEL ──────────────────────────────── */
 .pending-dates-panel {
