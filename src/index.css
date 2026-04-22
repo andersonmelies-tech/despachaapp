@@ -407,6 +407,21 @@ textarea.finput { resize: vertical; min-height: 80px; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); animation: pulse 2s infinite; }
 @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.3} }
 
+/* ── REGISTER STEPS ───────────────────────────────────── */
+.reg-steps {
+  display: flex; align-items: center; justify-content: center;
+  gap: 0; margin-bottom: 1.5rem;
+}
+.reg-step-dot {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 2px solid var(--border); color: var(--muted);
+  font-size: .8rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .2s;
+}
+.reg-step-dot.done { background: var(--blue); border-color: var(--blue); color: #fff; }
+.reg-step-line { width: 60px; height: 2px; background: var(--border); }
+
 /* ── SCROLLBAR ────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: var(--s1); }

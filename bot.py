@@ -68,11 +68,12 @@ def _sb_insert(table, data):
     try: return sb.table(table).insert(data).execute().data
     except Exception as e: print(f"[sb_insert] {e}"); return None
 
-def _get_tasks_sync(prov_id=None, status=None, urgency=None, overdue=False, search=None):
+def _get_tasks_sync(prov_id=None, company_id=None, status=None, urgency=None, overdue=False, search=None):
     if not sb: return []
     try:
         q = sb.table("tasks").select("*")
-        if prov_id:  q = q.eq("assignee_id", prov_id)
+        if company_id: q = q.eq("company_id", str(company_id))
+        if prov_id:    q = q.eq("assignee_id", prov_id)
         if status:   q = q.in_("status", status) if isinstance(status, list) else q.eq("status", status)
         if urgency:  q = q.eq("urgency", urgency)
         if overdue:
@@ -85,11 +86,16 @@ def _get_tasks_sync(prov_id=None, status=None, urgency=None, overdue=False, sear
         return sorted(tasks, key=lambda x: (ord_urg.get(x.get("urgency", ""), 4), -x["id"]))
     except Exception as e: print(f"[get_tasks] {e}"); return []
 
-def _get_stats_sync(prov_id):
+def _get_stats_sync(prov_id, company_id=None):
     if not sb: return {}, {}
     try:
-        all_tasks    = sb.table("tasks").select("*").eq("assignee_id", prov_id).execute().data or []
-        global_tasks = sb.table("tasks").select("*").execute().data or []
+        q_mine = sb.table("tasks").select("*").eq("assignee_id", prov_id)
+        q_glob = sb.table("tasks").select("*")
+        if company_id:
+            q_mine = q_mine.eq("company_id", str(company_id))
+            q_glob = q_glob.eq("company_id", str(company_id))
+        all_tasks    = q_mine.execute().data or []
+        global_tasks = q_glob.execute().data or []
         today = datetime.now().date().isoformat()
         mine = {
             "total":      len(all_tasks),
@@ -164,7 +170,8 @@ def get_token():
 
 # ── Estado de espera ──────────────────────────────────────────────────────────
 _waiting: dict = {}
-def set_wait(chat_id, mode, task_id=None): _waiting[str(chat_id)] = {"mode": mode, "task_id": task_id}
+def set_wait(chat_id, mode, task_id=None, extra=None):
+    _waiting[str(chat_id)] = {"mode": mode, "task_id": task_id, **(extra or {})}
 def get_wait(chat_id): return _waiting.get(str(chat_id), {})
 def clear_wait(chat_id): _waiting.pop(str(chat_id), None)
 
@@ -295,8 +302,22 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     user    = update.effective_user
     clear_wait(chat_id)
+
+    # Deep link: /start <invite_code> — vincula prestador à empresa pelo código
+    invite_code = None
+    if ctx.args:
+        invite_code = ctx.args[0].strip()
+
     provider = await get_prov(chat_id)
     if not provider:
+        # Resolve company_id pelo invite_code (se fornecido)
+        invite_company_id = None
+        if invite_code and sb:
+            try:
+                r = sb.table("companies").select("id").eq("invite_code", invite_code).eq("active", True).limit(1).execute()
+                if r.data: invite_company_id = r.data[0]["id"]
+            except: pass
+
         # Tenta vincular pelo nome do Telegram
         fn = (user.first_name or "").strip()
         ln = (user.last_name  or "").strip()
@@ -304,7 +325,10 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             if nm:
                 if not sb: break
                 try:
-                    r = sb.table("providers").select("*").ilike("name", f"%{nm}%").eq("active", 1).limit(1).execute()
+                    q = sb.table("providers").select("*").ilike("name", f"%{nm}%").eq("active", 1)
+                    if invite_company_id:
+                        q = q.eq("company_id", invite_company_id)
+                    r = q.limit(1).execute()
                     p = r.data[0] if r.data else None
                 except: p = None
                 if p:
@@ -317,7 +341,7 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             f"👷 Olá, *{provider['name']}*!\n🏢 Setor: {provider.get('sector') or '–'}\n\nEscolha uma opção:",
             parse_mode="Markdown", reply_markup=main_kb())
     else:
-        set_wait(chat_id, "name")
+        set_wait(chat_id, "name", extra={"invite_code": invite_code} if invite_code else None)
         await update.effective_message.reply_text(
             "👷 Bem-vindo ao *DespachaApp*!\n\nVocê não está vinculado como prestador.\n"
             "Digite seu *nome completo* exatamente como cadastrado no sistema:",
@@ -356,41 +380,47 @@ async def button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if data == "my_tasks":
         prov = await get_prov(chat_id)
         if not prov: await q.edit_message_text("❌ Prestador não vinculado. Use /start."); return
+        company_id = prov.get("company_id")
         # Uma única query com filtro OR de status
-        tasks = await aget_tasks(prov_id=prov["id"], status=["pendente", "em_andamento"])
+        tasks = await aget_tasks(prov_id=prov["id"], company_id=company_id, status=["pendente", "em_andamento"])
         await show_list(q, tasks, "📋 Suas Tarefas Abertas"); return
 
     if data == "in_progress":
         prov = await get_prov(chat_id)
         if not prov: await q.edit_message_text("❌ Prestador não vinculado."); return
-        tasks = await aget_tasks(prov_id=prov["id"], status="em_andamento")
+        company_id = prov.get("company_id")
+        tasks = await aget_tasks(prov_id=prov["id"], company_id=company_id, status="em_andamento")
         await show_list(q, tasks, "🔧 Em Andamento"); return
 
     if data == "criticas":
         prov = await get_prov(chat_id)
         if not prov: await q.edit_message_text("❌ Prestador não vinculado."); return
-        tasks = await aget_tasks(prov_id=prov["id"], urgency="critica")
+        company_id = prov.get("company_id")
+        tasks = await aget_tasks(prov_id=prov["id"], company_id=company_id, urgency="critica")
         tasks = [t for t in tasks if t.get("status") not in ("concluida","cancelada")]
         await show_list(q, tasks, "🚨 Tarefas Críticas"); return
 
     if data == "atrasadas":
         prov = await get_prov(chat_id)
         if not prov: await q.edit_message_text("❌ Prestador não vinculado."); return
-        tasks = await aget_tasks(prov_id=prov["id"], overdue=True)
+        company_id = prov.get("company_id")
+        tasks = await aget_tasks(prov_id=prov["id"], company_id=company_id, overdue=True)
         await show_list(q, tasks, "⏰ Tarefas Atrasadas"); return
 
     if data == "done_today":
         prov = await get_prov(chat_id)
         if not prov: await q.edit_message_text("❌ Prestador não vinculado."); return
+        company_id = prov.get("company_id")
         today = datetime.now().strftime("%Y-%m-%d")
-        tasks = await aget_tasks(prov_id=prov["id"], status="concluida")
+        tasks = await aget_tasks(prov_id=prov["id"], company_id=company_id, status="concluida")
         tasks = [t for t in tasks if (t.get("completed_at") or "").startswith(today)]
         await show_list(q, tasks, f"✅ Concluídas Hoje ({len(tasks)})"); return
 
     if data == "stats":
         prov = await get_prov(chat_id)
         if not prov: await q.edit_message_text("❌ Prestador não encontrado."); return
-        mine, geral = await asyncio.to_thread(_get_stats_sync, prov["id"])
+        company_id = prov.get("company_id")
+        mine, geral = await asyncio.to_thread(_get_stats_sync, prov["id"], company_id)
         msg = (f"📊 *Meu Desempenho — {prov['name']}*\n━━━━━━━━━━━━━━━━\n"
                f"📦 Total: *{mine.get('total',0)}*\n✅ Concluídas: *{mine.get('concluidas',0)}*\n"
                f"🔧 Em andamento: *{mine.get('andamento',0)}*\n⏰ Atrasadas: *{mine.get('atrasadas',0)}*\n"
@@ -488,11 +518,22 @@ async def text_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     mode    = wait.get("mode")
 
     if mode == "name":
+        saved_invite = wait.get("invite_code")
         clear_wait(chat_id)
         name = update.message.text.strip()
         if not sb: await update.message.reply_text("❌ Sem conexão com o banco."); return
+        # Resolve company_id pelo invite_code salvo (se houver)
+        invite_company_id = None
+        if saved_invite:
+            try:
+                r = sb.table("companies").select("id").eq("invite_code", saved_invite).eq("active", True).limit(1).execute()
+                if r.data: invite_company_id = r.data[0]["id"]
+            except: pass
         try:
-            r = sb.table("providers").select("*").ilike("name", f"%{name}%").eq("active", 1).limit(1).execute()
+            q = sb.table("providers").select("*").ilike("name", f"%{name}%").eq("active", 1)
+            if invite_company_id:
+                q = q.eq("company_id", invite_company_id)
+            r = q.limit(1).execute()
             p = r.data[0] if r.data else None
         except: p = None
         if p:
@@ -502,7 +543,7 @@ async def text_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 f"✅ Vinculado como *{p['name']}*!\n\nEscolha uma opção:",
                 parse_mode="Markdown", reply_markup=main_kb())
         else:
-            set_wait(chat_id, "name")
+            set_wait(chat_id, "name", extra={"invite_code": saved_invite} if saved_invite else None)
             await update.message.reply_text(
                 f"❌ *'{name}'* não encontrado no sistema.\nVerifique o nome e tente novamente:",
                 parse_mode="Markdown")
@@ -512,7 +553,8 @@ async def text_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         clear_wait(chat_id)
         prov  = await get_prov(chat_id)
         term  = update.message.text.strip()
-        tasks = await aget_tasks(prov_id=prov["id"] if prov else None, search=term)
+        company_id = prov.get("company_id") if prov else None
+        tasks = await aget_tasks(prov_id=prov["id"] if prov else None, company_id=company_id, search=term)
         msg   = f"🔍 *'{term}'* — {len(tasks)} resultado(s)\n━━━━━━━━━━━━━━━━\n"
         btns  = []
         for t in tasks[:8]:
@@ -649,7 +691,17 @@ async def notify_new_tasks(ctx: ContextTypes.DEFAULT_TYPE):
     for task in tasks:
         await asyncio.to_thread(_sb_update, "tasks", {"provider_notified": True}, id=task["id"])
         if not task.get("assignee_id"): continue
-        prov = await aone("providers", id=task["assignee_id"])
+        # Filtra prestador pela mesma company_id da tarefa (bot usa service_role — sem RLS)
+        task_company_id = task.get("company_id")
+        if task_company_id:
+            prov = None
+            if sb:
+                try:
+                    r = sb.table("providers").select("*").eq("id", task["assignee_id"]).eq("company_id", str(task_company_id)).limit(1).execute()
+                    prov = r.data[0] if r.data else None
+                except: prov = None
+        else:
+            prov = await aone("providers", id=task["assignee_id"])
         if not prov or not prov.get("chat_id"): continue
         urg = URG.get(task.get("urgency", ""), "")
         sla = fmt_date(task.get("sla_deadline", ""))
