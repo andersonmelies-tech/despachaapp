@@ -1,14 +1,7 @@
 #!/usr/bin/env python3
 """DespachaApp Bot — Telegram + Supabase"""
-import os, sys, base64, io, json as _json
+import os, sys, base64, io, json as _json, asyncio, time
 from datetime import datetime
-
-try:
-    from PIL import Image as _PILImage
-    PIL_OK = True
-except ImportError:
-    PIL_OK = False
-    print("[BOT] Pillow não instalado — fotos sem compressão")
 
 for _s in (sys.stdout, sys.stderr):
     if _s and hasattr(_s, 'reconfigure'):
@@ -23,6 +16,12 @@ except ImportError:
     print("[BOT] ERRO: instale supabase — pip install supabase")
 
 try:
+    from PIL import Image as _PILImage
+    PIL_OK = True
+except ImportError:
+    PIL_OK = False
+
+try:
     from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
     from telegram.ext import (ApplicationBuilder, CommandHandler,
                                CallbackQueryHandler, MessageHandler,
@@ -32,12 +31,13 @@ except ImportError:
     TELEGRAM_OK = False
     print("[BOT] ERRO: instale python-telegram-bot")
 
-# ── Supabase ──────────────────────────────────────────────────────────────────
+# ── Supabase (cliente síncrono) ───────────────────────────────────────────────
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "").strip()
 sb = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_OK and SUPABASE_URL else None
 
-def sb_one(table, **kw):
+# ── Helpers síncronos (chamados via asyncio.to_thread) ────────────────────────
+def _sb_one(table, **kw):
     if not sb: return None
     try:
         q = sb.table(table).select("*")
@@ -46,7 +46,7 @@ def sb_one(table, **kw):
         return r.data[0] if r.data else None
     except Exception as e: print(f"[sb_one] {e}"); return None
 
-def sb_all(table, order=None, **kw):
+def _sb_all(table, order=None, **kw):
     if not sb: return []
     try:
         q = sb.table(table).select("*")
@@ -55,7 +55,7 @@ def sb_all(table, order=None, **kw):
         return q.execute().data or []
     except Exception as e: print(f"[sb_all] {e}"); return []
 
-def sb_update(table, data, **kw):
+def _sb_update(table, data, **kw):
     if not sb: return None
     try:
         q = sb.table(table).update(data)
@@ -63,47 +63,18 @@ def sb_update(table, data, **kw):
         return q.execute().data
     except Exception as e: print(f"[sb_update] {e}"); return None
 
-def sb_insert(table, data):
+def _sb_insert(table, data):
     if not sb: return None
     try: return sb.table(table).insert(data).execute().data
     except Exception as e: print(f"[sb_insert] {e}"); return None
 
-# ── Admin chat ────────────────────────────────────────────────────────────────
-def get_admin_chat_id():
-    row = sb_one("config", key="admin_chat_id")
-    cid = (row or {}).get("value", "").strip()
-    return cid if cid else os.environ.get("ADMIN_CHAT_ID", "").strip()
-
-# ── Token ─────────────────────────────────────────────────────────────────────
-def get_token():
-    row = sb_one("config", key="telegram_token")
-    t = (row or {}).get("value", "").strip()
-    return t if t and len(t) > 20 else os.environ.get("TELEGRAM_TOKEN", "").strip()
-
-# ── DB helpers ────────────────────────────────────────────────────────────────
-def get_provider_by_chat(chat_id):
-    return sb_one("providers", chat_id=str(chat_id), active=1)
-
-def get_provider_by_name(name):
-    if not sb: return None
-    try:
-        r = sb.table("providers").select("*").ilike("name", f"%{name}%").eq("active", 1).limit(1).execute()
-        return r.data[0] if r.data else None
-    except: return None
-
-def link_provider(provider_id, chat_id):
-    sb_update("providers", {"chat_id": str(chat_id)}, id=provider_id)
-
-def get_tasks(chat_id=None, status=None, urgency=None, overdue=False, search=None):
+def _get_tasks_sync(prov_id=None, status=None, urgency=None, overdue=False, search=None):
     if not sb: return []
     try:
         q = sb.table("tasks").select("*")
-        if chat_id:
-            prov = get_provider_by_chat(chat_id)
-            if not prov: return []
-            q = q.eq("assignee_id", prov["id"])
-        if status:  q = q.eq("status", status)
-        if urgency: q = q.eq("urgency", urgency)
+        if prov_id:  q = q.eq("assignee_id", prov_id)
+        if status:   q = q.in_("status", status) if isinstance(status, list) else q.eq("status", status)
+        if urgency:  q = q.eq("urgency", urgency)
         if overdue:
             now = datetime.now().isoformat()
             q = q.lt("sla_deadline", now).not_.in_("status", ["concluida", "cancelada"])
@@ -114,8 +85,31 @@ def get_tasks(chat_id=None, status=None, urgency=None, overdue=False, search=Non
         return sorted(tasks, key=lambda x: (ord_urg.get(x.get("urgency", ""), 4), -x["id"]))
     except Exception as e: print(f"[get_tasks] {e}"); return []
 
-def update_task(task_id, chat_id, **fields):
-    task = sb_one("tasks", id=task_id)
+def _get_stats_sync(prov_id):
+    if not sb: return {}, {}
+    try:
+        all_tasks    = sb.table("tasks").select("*").eq("assignee_id", prov_id).execute().data or []
+        global_tasks = sb.table("tasks").select("*").execute().data or []
+        today = datetime.now().date().isoformat()
+        mine = {
+            "total":      len(all_tasks),
+            "concluidas": sum(1 for t in all_tasks if t["status"] == "concluida"),
+            "andamento":  sum(1 for t in all_tasks if t["status"] == "em_andamento"),
+            "atrasadas":  sum(1 for t in all_tasks if t.get("due_date","") < today and t["status"] not in ("concluida","cancelada")),
+        }
+        fin  = [t for t in all_tasks    if t.get("elapsed_minutes")]
+        gfin = [t for t in global_tasks if t.get("elapsed_minutes")]
+        mine["avg_min"] = sum(t["elapsed_minutes"] for t in fin) // len(fin) if fin else None
+        geral = {
+            "concluida":   sum(1 for t in global_tasks if t["status"] == "concluida"),
+            "pendente":    sum(1 for t in global_tasks if t["status"] == "pendente"),
+            "avg_minutes": sum(t["elapsed_minutes"] for t in gfin) // len(gfin) if gfin else None,
+        }
+        return mine, geral
+    except Exception as e: print(f"[get_stats] {e}"); return {}, {}
+
+def _update_task_sync(task_id, chat_id, **fields):
+    task = _sb_one("tasks", id=task_id)
     if not task: return None
     now = datetime.now().isoformat()
     updates = dict(fields)
@@ -130,62 +124,63 @@ def update_task(task_id, chat_id, **fields):
                     e = int((datetime.now() - datetime.fromisoformat(task["started_at"].replace("Z",""))).total_seconds() / 60)
                     updates["elapsed_minutes"] = e
                 except: pass
-    sb_update("tasks", updates, id=task_id)
+    _sb_update("tasks", updates, id=task_id)
     for k, v in fields.items():
         if str(task.get(k, "")) != str(v or ""):
-            sb_insert("task_history", {"task_id": task_id, "action": k,
+            _sb_insert("task_history", {"task_id": task_id, "action": k,
                 "old_value": str(task.get(k, "")), "new_value": str(v or ""),
                 "changed_by": f"tg:{chat_id}"})
-    return sb_one("tasks", id=task_id)
+    return _sb_one("tasks", id=task_id)
 
-def get_stats(chat_id):
-    prov = get_provider_by_chat(chat_id)
-    if not prov: return None, {}, {}
-    pid = prov["id"]
-    all_tasks = sb_all("tasks", assignee_id=pid) if sb else []
-    global_tasks = sb.table("tasks").select("*").execute().data if sb else []
-    today = datetime.now().date().isoformat()
-    mine = {
-        "total":      len(all_tasks),
-        "concluidas": sum(1 for t in all_tasks if t["status"] == "concluida"),
-        "andamento":  sum(1 for t in all_tasks if t["status"] == "em_andamento"),
-        "atrasadas":  sum(1 for t in all_tasks if t.get("due_date","") < today and t["status"] not in ("concluida","cancelada")),
-    }
-    fin = [t for t in all_tasks if t.get("elapsed_minutes")]
-    mine["avg_min"] = sum(t["elapsed_minutes"] for t in fin) // len(fin) if fin else None
-    gfin = [t for t in global_tasks if t.get("elapsed_minutes")]
-    geral = {
-        "concluida":   sum(1 for t in global_tasks if t["status"] == "concluida"),
-        "pendente":    sum(1 for t in global_tasks if t["status"] == "pendente"),
-        "avg_minutes": sum(t["elapsed_minutes"] for t in gfin) // len(gfin) if gfin else None,
-    }
-    return prov, mine, geral
+# ── Wrappers async (não bloqueiam o event loop) ───────────────────────────────
+async def aone(table, **kw):       return await asyncio.to_thread(_sb_one, table, **kw)
+async def aall(table, **kw):       return await asyncio.to_thread(_sb_all, table, **kw)
+async def aupd(table, data, **kw): return await asyncio.to_thread(_sb_update, table, data, **kw)
+async def ains(table, data):       return await asyncio.to_thread(_sb_insert, table, data)
+async def aget_tasks(**kw):        return await asyncio.to_thread(_get_tasks_sync, **kw)
+async def aupdate_task(tid, cid, **fields): return await asyncio.to_thread(_update_task_sync, tid, cid, **fields)
+
+# ── Cache de prestador (evita query repetida a cada clique) ───────────────────
+_prov_cache: dict = {}
+_CACHE_TTL = 300  # 5 minutos
+
+async def get_prov(chat_id):
+    cid = str(chat_id)
+    entry = _prov_cache.get(cid)
+    if entry and (time.monotonic() - entry[1]) < _CACHE_TTL:
+        return entry[0]
+    p = await aone("providers", chat_id=cid, active=1)
+    _prov_cache[cid] = (p, time.monotonic())
+    return p
+
+def invalidate_prov_cache(chat_id):
+    _prov_cache.pop(str(chat_id), None)
+
+# ── Token ─────────────────────────────────────────────────────────────────────
+def get_token():
+    row = _sb_one("config", key="telegram_token")
+    t = (row or {}).get("value", "").strip()
+    return t if t and len(t) > 20 else os.environ.get("TELEGRAM_TOKEN", "").strip()
+
+# ── Estado de espera ──────────────────────────────────────────────────────────
+_waiting: dict = {}
+def set_wait(chat_id, mode, task_id=None): _waiting[str(chat_id)] = {"mode": mode, "task_id": task_id}
+def get_wait(chat_id): return _waiting.get(str(chat_id), {})
+def clear_wait(chat_id): _waiting.pop(str(chat_id), None)
 
 # ── Compressão de imagem ──────────────────────────────────────────────────────
 def compress_photo(img_bytes, max_px=800, quality=62):
-    """Redimensiona para max_px e recodifica em JPEG economizando espaço no banco."""
-    if not PIL_OK:
-        return img_bytes
+    if not PIL_OK: return img_bytes
     try:
         img = _PILImage.open(io.BytesIO(img_bytes))
-        if img.mode not in ("RGB", "L"):
-            img = img.convert("RGB")
+        if img.mode not in ("RGB", "L"): img = img.convert("RGB")
         img.thumbnail((max_px, max_px), _PILImage.LANCZOS)
         buf = io.BytesIO()
         img.save(buf, format="JPEG", quality=quality, optimize=True)
         compressed = buf.getvalue()
         print(f"[compress] {len(img_bytes)//1024}KB → {len(compressed)//1024}KB")
         return compressed
-    except Exception as e:
-        print(f"[compress_photo] {e}")
-        return img_bytes
-
-# ── Estado de espera ──────────────────────────────────────────────────────────
-_waiting = {}
-def set_wait(chat_id, mode, task_id=None):
-    _waiting[str(chat_id)] = {"mode": mode, "task_id": task_id}
-def get_wait(chat_id): return _waiting.get(str(chat_id), {})
-def clear_wait(chat_id): _waiting.pop(str(chat_id), None)
+    except Exception as e: print(f"[compress_photo] {e}"); return img_bytes
 
 # ── Labels / formatação ───────────────────────────────────────────────────────
 URG = {"critica": "🚨 CRÍTICA", "alta": "🔴 Alta", "media": "🟡 Média", "baixa": "🟢 Baixa"}
@@ -227,7 +222,7 @@ def fmt_detail(t):
         f"👤 *Prestador:* {t['assignee']}\n"
         f"🏢 *Setor:* {t.get('sector') or '–'}\n"
         f"🏷 *Categoria:* {t.get('category') or '–'}\n\n"
-        f"⏱ *📌 Conclusão prevista (SLA):* *{sla}*\n"
+        f"⏱ *Conclusão prevista (SLA):* *{sla}*\n"
         f"⚡ *Urgência:* {t.get('urgency','').upper()}\n"
         f"🔄 *Status:* {sta}\n\n"
         f"🕐 *Iniciada:* {fmt_date(t.get('started_at',''))}\n"
@@ -258,12 +253,12 @@ def task_kb(t):
         rows.append([InlineKeyboardButton("✅ FINALIZAR TAREFA", callback_data=f"done:{tid}")])
     if st not in ("cancelada","concluida"):
         rows.append([
-            InlineKeyboardButton("💬 Observação",    callback_data=f"obs:{tid}"),
-            InlineKeyboardButton("📷 Enviar Foto",   callback_data=f"photo:{tid}"),
+            InlineKeyboardButton("💬 Observação",       callback_data=f"obs:{tid}"),
+            InlineKeyboardButton("📷 Enviar Foto",      callback_data=f"photo:{tid}"),
         ])
         rows.append([
             InlineKeyboardButton("📅 Propor Nova Data", callback_data=f"newdate:{tid}"),
-            InlineKeyboardButton("❌ Cancelar",         callback_data=f"cancel:{tid}"),
+            InlineKeyboardButton("❌ Cancelar",          callback_data=f"cancel:{tid}"),
         ])
     rows.append([
         InlineKeyboardButton("🔙 Minhas Tarefas", callback_data="my_tasks"),
@@ -271,7 +266,7 @@ def task_kb(t):
     ])
     return InlineKeyboardMarkup(rows)
 
-# ── Helpers de envio de fotos ─────────────────────────────────────────────────
+# ── Envio de fotos ────────────────────────────────────────────────────────────
 async def send_task_photos(bot, chat_id, task):
     photos_json = task.get("photos")
     if not photos_json: return
@@ -298,18 +293,24 @@ async def send_task_photos(bot, chat_id, task):
 # ── Handlers ──────────────────────────────────────────────────────────────────
 async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
-    user = update.effective_user
+    user    = update.effective_user
     clear_wait(chat_id)
-    provider = get_provider_by_chat(chat_id)
+    provider = await get_prov(chat_id)
     if not provider:
+        # Tenta vincular pelo nome do Telegram
         fn = (user.first_name or "").strip()
         ln = (user.last_name  or "").strip()
         for nm in [f"{fn} {ln}".strip(), fn, ln]:
             if nm:
-                p = get_provider_by_name(nm)
+                if not sb: break
+                try:
+                    r = sb.table("providers").select("*").ilike("name", f"%{nm}%").eq("active", 1).limit(1).execute()
+                    p = r.data[0] if r.data else None
+                except: p = None
                 if p:
-                    link_provider(p["id"], chat_id)
-                    provider = sb_one("providers", id=p["id"])
+                    await aupd("providers", {"chat_id": chat_id}, id=p["id"])
+                    invalidate_prov_cache(chat_id)
+                    provider = await get_prov(chat_id)
                     break
     if provider:
         await update.effective_message.reply_text(
@@ -341,50 +342,62 @@ async def show_list(q, tasks, title):
 
 async def button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    await q.answer()
-    data = q.data
+    await q.answer()   # responde imediatamente — remove o "loading" no Telegram
+    data    = q.data
     chat_id = str(update.effective_chat.id)
     clear_wait(chat_id)
 
     if data == "menu":
-        prov = get_provider_by_chat(chat_id)
+        prov = await get_prov(chat_id)
         name = prov["name"] if prov else "Prestador"
         await q.edit_message_text(f"👷 *{name}* — Menu Principal:",
             parse_mode="Markdown", reply_markup=main_kb()); return
 
     if data == "my_tasks":
-        tasks = get_tasks(chat_id=chat_id, status="pendente") + get_tasks(chat_id=chat_id, status="em_andamento")
-        tasks.sort(key=lambda x: {"critica":0,"alta":1,"media":2,"baixa":3}.get(x.get("urgency",""),4))
+        prov = await get_prov(chat_id)
+        if not prov: await q.edit_message_text("❌ Prestador não vinculado. Use /start."); return
+        # Uma única query com filtro OR de status
+        tasks = await aget_tasks(prov_id=prov["id"], status=["pendente", "em_andamento"])
         await show_list(q, tasks, "📋 Suas Tarefas Abertas"); return
 
     if data == "in_progress":
-        await show_list(q, get_tasks(chat_id=chat_id, status="em_andamento"), "🔧 Em Andamento"); return
+        prov = await get_prov(chat_id)
+        if not prov: await q.edit_message_text("❌ Prestador não vinculado."); return
+        tasks = await aget_tasks(prov_id=prov["id"], status="em_andamento")
+        await show_list(q, tasks, "🔧 Em Andamento"); return
 
     if data == "criticas":
-        tasks = [t for t in get_tasks(chat_id=chat_id, urgency="critica")
-                 if t.get("status") not in ("concluida","cancelada")]
+        prov = await get_prov(chat_id)
+        if not prov: await q.edit_message_text("❌ Prestador não vinculado."); return
+        tasks = await aget_tasks(prov_id=prov["id"], urgency="critica")
+        tasks = [t for t in tasks if t.get("status") not in ("concluida","cancelada")]
         await show_list(q, tasks, "🚨 Tarefas Críticas"); return
 
     if data == "atrasadas":
-        await show_list(q, get_tasks(chat_id=chat_id, overdue=True), "⏰ Tarefas Atrasadas"); return
+        prov = await get_prov(chat_id)
+        if not prov: await q.edit_message_text("❌ Prestador não vinculado."); return
+        tasks = await aget_tasks(prov_id=prov["id"], overdue=True)
+        await show_list(q, tasks, "⏰ Tarefas Atrasadas"); return
 
     if data == "done_today":
+        prov = await get_prov(chat_id)
+        if not prov: await q.edit_message_text("❌ Prestador não vinculado."); return
         today = datetime.now().strftime("%Y-%m-%d")
-        tasks = [t for t in get_tasks(chat_id=chat_id, status="concluida")
-                 if (t.get("completed_at") or "").startswith(today)]
+        tasks = await aget_tasks(prov_id=prov["id"], status="concluida")
+        tasks = [t for t in tasks if (t.get("completed_at") or "").startswith(today)]
         await show_list(q, tasks, f"✅ Concluídas Hoje ({len(tasks)})"); return
 
     if data == "stats":
-        prov, mine, geral = get_stats(chat_id)
-        if not prov:
-            await q.edit_message_text("❌ Prestador não encontrado."); return
+        prov = await get_prov(chat_id)
+        if not prov: await q.edit_message_text("❌ Prestador não encontrado."); return
+        mine, geral = await asyncio.to_thread(_get_stats_sync, prov["id"])
         msg = (f"📊 *Meu Desempenho — {prov['name']}*\n━━━━━━━━━━━━━━━━\n"
-               f"📦 Total: *{mine['total']}*\n✅ Concluídas: *{mine['concluidas']}*\n"
-               f"🔧 Em andamento: *{mine['andamento']}*\n⏰ Atrasadas: *{mine['atrasadas']}*\n"
-               f"⏱ Tempo médio: *{elapsed_str(mine['avg_min'])}*\n\n"
+               f"📦 Total: *{mine.get('total',0)}*\n✅ Concluídas: *{mine.get('concluidas',0)}*\n"
+               f"🔧 Em andamento: *{mine.get('andamento',0)}*\n⏰ Atrasadas: *{mine.get('atrasadas',0)}*\n"
+               f"⏱ Tempo médio: *{elapsed_str(mine.get('avg_min'))}*\n\n"
                f"*📈 Geral da equipe:*\n"
-               f"✅ {geral['concluida']} concluídas | ⏳ {geral['pendente']} pendentes\n"
-               f"⏱ Média global: {elapsed_str(geral['avg_minutes'])}")
+               f"✅ {geral.get('concluida',0)} concluídas | ⏳ {geral.get('pendente',0)} pendentes\n"
+               f"⏱ Média global: {elapsed_str(geral.get('avg_minutes'))}")
         await q.edit_message_text(msg, parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Menu", callback_data="menu")]])); return
 
@@ -394,14 +407,14 @@ async def button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"); return
 
     if data.startswith("view:"):
-        task = sb_one("tasks", id=int(data.split(":")[1]))
+        task = await aone("tasks", id=int(data.split(":")[1]))
         if not task: await q.edit_message_text("❌ Tarefa não encontrada."); return
         await q.edit_message_text(fmt_detail(task), parse_mode="Markdown", reply_markup=task_kb(task))
         await send_task_photos(ctx.bot, chat_id, task); return
 
     if data.startswith("start:"):
-        tid = int(data.split(":")[1])
-        task = update_task(tid, chat_id, status="em_andamento")
+        tid  = int(data.split(":")[1])
+        task = await aupdate_task(tid, chat_id, status="em_andamento")
         if task:
             sla = fmt_date(task.get("sla_deadline",""))
             await q.edit_message_text(
@@ -418,8 +431,8 @@ async def button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                     [InlineKeyboardButton("🔙 Minhas Tarefas",  callback_data="my_tasks")]])); return
 
     if data.startswith("done:"):
-        tid = int(data.split(":")[1])
-        task = update_task(tid, chat_id, status="concluida")
+        tid  = int(data.split(":")[1])
+        task = await aupdate_task(tid, chat_id, status="concluida")
         if task:
             await q.edit_message_text(
                 f"✅ *Tarefa #{tid} CONCLUÍDA!*\n\n"
@@ -434,11 +447,10 @@ async def button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if data.startswith("cancel:"):
         tid = int(data.split(":")[1])
-        update_task(tid, chat_id, status="cancelada")
+        await aupdate_task(tid, chat_id, status="cancelada")
         await q.edit_message_text(f"❌ Tarefa #{tid} cancelada.",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Menu", callback_data="menu")]])); return
 
-    # ── Observação ────────────────────────────────────────────
     if data.startswith("obs:"):
         tid = int(data.split(":")[1])
         set_wait(chat_id, "obs", task_id=tid)
@@ -448,28 +460,24 @@ async def button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancelar", callback_data=f"view:{tid}")]])); return
 
-    # ── Foto ──────────────────────────────────────────────────
     if data.startswith("photo:"):
         tid = int(data.split(":")[1])
         set_wait(chat_id, "photo", task_id=tid)
         await q.edit_message_text(
             f"📷 *Enviar Foto — Tarefa #{tid}*\n\n"
-            f"Envie a foto agora.\n"
-            f"Você pode adicionar uma legenda junto com a foto.",
+            f"Envie a foto agora. Você pode adicionar legenda junto com a foto.",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancelar", callback_data=f"view:{tid}")]])); return
 
-    # ── Propor nova data ──────────────────────────────────────
     if data.startswith("newdate:"):
-        tid = int(data.split(":")[1])
-        task = sb_one("tasks", id=tid)
-        sla = fmt_date(task.get("sla_deadline","")) if task else "–"
+        tid  = int(data.split(":")[1])
+        task = await aone("tasks", id=tid)
+        sla  = fmt_date(task.get("sla_deadline","")) if task else "–"
         set_wait(chat_id, "newdate", task_id=tid)
         await q.edit_message_text(
             f"📅 *Propor Nova Data — Tarefa #{tid}*\n\n"
             f"⏱ Data atual (SLA): *{sla}*\n\n"
-            f"Digite a nova data proposta no formato:\n*DD/MM/AAAA*\n\n"
-            f"_Ex: 25/12/2025_",
+            f"Digite a nova data proposta no formato:\n*DD/MM/AAAA*\n\n_Ex: 25/12/2025_",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancelar", callback_data=f"view:{tid}")]])); return
 
@@ -482,9 +490,14 @@ async def text_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if mode == "name":
         clear_wait(chat_id)
         name = update.message.text.strip()
-        p = get_provider_by_name(name)
+        if not sb: await update.message.reply_text("❌ Sem conexão com o banco."); return
+        try:
+            r = sb.table("providers").select("*").ilike("name", f"%{name}%").eq("active", 1).limit(1).execute()
+            p = r.data[0] if r.data else None
+        except: p = None
         if p:
-            link_provider(p["id"], chat_id)
+            await aupd("providers", {"chat_id": chat_id}, id=p["id"])
+            invalidate_prov_cache(chat_id)
             await update.message.reply_text(
                 f"✅ Vinculado como *{p['name']}*!\n\nEscolha uma opção:",
                 parse_mode="Markdown", reply_markup=main_kb())
@@ -497,8 +510,9 @@ async def text_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if mode == "search":
         clear_wait(chat_id)
+        prov  = await get_prov(chat_id)
         term  = update.message.text.strip()
-        tasks = get_tasks(chat_id=chat_id, search=term) or get_tasks(search=term)
+        tasks = await aget_tasks(prov_id=prov["id"] if prov else None, search=term)
         msg   = f"🔍 *'{term}'* — {len(tasks)} resultado(s)\n━━━━━━━━━━━━━━━━\n"
         btns  = []
         for t in tasks[:8]:
@@ -511,60 +525,60 @@ async def text_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if mode == "obs":
         clear_wait(chat_id)
         tid  = wait.get("task_id")
-        task = sb_one("tasks", id=tid) if tid else None
-        if not task:
-            await update.message.reply_text("❌ Tarefa não encontrada."); return
-        prov = get_provider_by_chat(chat_id)
+        task = await aone("tasks", id=tid) if tid else None
+        if not task: await update.message.reply_text("❌ Tarefa não encontrada."); return
+        prov = await get_prov(chat_id)
         name = prov["name"] if prov else "Prestador"
-        now_str = datetime.now().strftime("%d/%m %H:%M")
+        now_str  = datetime.now().strftime("%d/%m %H:%M")
         nova_obs = f"[{now_str}] {name}: {update.message.text.strip()}"
-        obs_existente = task.get("provider_obs","") or ""
-        obs_final = f"{obs_existente}\n{nova_obs}".strip() if obs_existente else nova_obs
-        sb_update("tasks", {"provider_obs": obs_final}, id=tid)
-        sb_insert("task_history", {"task_id": tid, "action": "observacao_prestador",
-            "old_value": "", "new_value": nova_obs, "changed_by": f"tg:{name}"})
+        obs_ant  = task.get("provider_obs","") or ""
+        obs_final = f"{obs_ant}\n{nova_obs}".strip() if obs_ant else nova_obs
+        await asyncio.gather(
+            aupd("tasks", {"provider_obs": obs_final}, id=tid),
+            ains("task_history", {"task_id": tid, "action": "observacao_prestador",
+                "old_value": "", "new_value": nova_obs, "changed_by": f"tg:{name}"})
+        )
         await update.message.reply_text(
             f"💬 *Observação salva na tarefa #{tid}!*\n\n_{nova_obs}_",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("👁 Ver tarefa",     callback_data=f"view:{tid}"),
-                InlineKeyboardButton("🏠 Menu",           callback_data="menu")]])); return
+                InlineKeyboardButton("👁 Ver tarefa", callback_data=f"view:{tid}"),
+                InlineKeyboardButton("🏠 Menu",        callback_data="menu")]])); return
 
     if mode == "newdate":
         clear_wait(chat_id)
         tid  = wait.get("task_id")
-        task = sb_one("tasks", id=tid) if tid else None
-        if not task:
-            await update.message.reply_text("❌ Tarefa não encontrada."); return
+        task = await aone("tasks", id=tid) if tid else None
+        if not task: await update.message.reply_text("❌ Tarefa não encontrada."); return
         raw = update.message.text.strip()
         try:
-            dt = datetime.strptime(raw, "%d/%m/%Y")
+            dt       = datetime.strptime(raw, "%d/%m/%Y")
             new_date = dt.strftime("%Y-%m-%d")
         except:
             set_wait(chat_id, "newdate", task_id=tid)
             await update.message.reply_text(
                 f"❌ Formato inválido. Use *DD/MM/AAAA*\nEx: 25/12/2025",
                 parse_mode="Markdown"); return
-        prov = get_provider_by_chat(chat_id)
+        prov = await get_prov(chat_id)
         name = prov["name"] if prov else "Prestador"
-        sb_update("tasks", {"provider_new_date": new_date}, id=tid)
-        sb_insert("task_history", {"task_id": tid, "action": "proposta_nova_data",
-            "old_value": str(task.get("due_date","") or ""), "new_value": new_date,
-            "changed_by": f"tg:{name}"})
+        await asyncio.gather(
+            aupd("tasks", {"provider_new_date": new_date}, id=tid),
+            ains("task_history", {"task_id": tid, "action": "proposta_nova_data",
+                "old_value": str(task.get("due_date","") or ""), "new_value": new_date,
+                "changed_by": f"tg:{name}"})
+        )
         await update.message.reply_text(
             f"📅 *Nova data proposta para #{tid}!*\n\n"
             f"Data: *{raw}*\n\n"
-            f"_O gestor será notificado e poderá aprovar ou recusar._",
+            f"_O gestor verá no sistema e poderá aprovar ou recusar._",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("👁 Ver tarefa",  callback_data=f"view:{tid}"),
-                InlineKeyboardButton("🏠 Menu",        callback_data="menu")]]))
-        return
+                InlineKeyboardButton("👁 Ver tarefa", callback_data=f"view:{tid}"),
+                InlineKeyboardButton("🏠 Menu",       callback_data="menu")]])); return
 
     await start(update, ctx)
 
 async def photo_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Recebe foto enviada pelo prestador"""
     if not update.message or not update.message.photo: return
     chat_id = str(update.effective_chat.id)
     wait    = get_wait(chat_id)
@@ -573,24 +587,20 @@ async def photo_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
     clear_wait(chat_id)
     tid  = wait.get("task_id")
-    task = sb_one("tasks", id=tid) if tid else None
-    if not task:
-        await update.message.reply_text("❌ Tarefa não encontrada."); return
+    task = await aone("tasks", id=tid) if tid else None
+    if not task: await update.message.reply_text("❌ Tarefa não encontrada."); return
 
-    await update.message.reply_text("⏳ Processando foto...")
+    await update.message.reply_text("⏳ Processando foto…")
     try:
-        # Baixa a foto maior disponível
         photo_obj = update.message.photo[-1]
         tg_file   = await ctx.bot.get_file(photo_obj.file_id)
         buf = io.BytesIO()
         await tg_file.download_to_memory(buf)
-        img_bytes = compress_photo(buf.getvalue())
+        img_bytes = await asyncio.to_thread(compress_photo, buf.getvalue())
 
-        # Converte para base64
         b64      = base64.b64encode(img_bytes).decode()
         data_url = f"data:image/jpeg;base64,{b64}"
 
-        # Adiciona ao array de fotos existente
         existing = []
         try:
             if task.get("photos"): existing = _json.loads(task["photos"])
@@ -598,77 +608,69 @@ async def photo_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         existing.append(data_url)
 
         updates = {"photos": _json.dumps(existing)}
-
-        # Legenda da foto vira observação
         caption = update.message.caption
         if caption:
-            prov = get_provider_by_chat(chat_id)
+            prov = await get_prov(chat_id)
             name = prov["name"] if prov else "Prestador"
-            now_str = datetime.now().strftime("%d/%m %H:%M")
+            now_str  = datetime.now().strftime("%d/%m %H:%M")
             nova_obs = f"[{now_str}] {name} (foto): {caption}"
-            obs_existente = task.get("provider_obs","") or ""
-            updates["provider_obs"] = f"{obs_existente}\n{nova_obs}".strip() if obs_existente else nova_obs
+            obs_ant  = task.get("provider_obs","") or ""
+            updates["provider_obs"] = f"{obs_ant}\n{nova_obs}".strip() if obs_ant else nova_obs
 
-        sb_update("tasks", updates, id=tid)
-        sb_insert("task_history", {"task_id": tid, "action": "foto_prestador",
-            "old_value": "", "new_value": f"Foto adicionada via Telegram",
-            "changed_by": f"tg:{chat_id}"})
-
+        await asyncio.gather(
+            aupd("tasks", updates, id=tid),
+            ains("task_history", {"task_id": tid, "action": "foto_prestador",
+                "old_value": "", "new_value": "Foto adicionada via Telegram",
+                "changed_by": f"tg:{chat_id}"})
+        )
         await update.message.reply_text(
             f"📷 *Foto adicionada à tarefa #{tid}!*",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("👁 Ver tarefa",  callback_data=f"view:{tid}"),
-                InlineKeyboardButton("🏠 Menu",        callback_data="menu")]]))
+                InlineKeyboardButton("👁 Ver tarefa", callback_data=f"view:{tid}"),
+                InlineKeyboardButton("🏠 Menu",       callback_data="menu")]]))
     except Exception as e:
         print(f"[photo_handler] erro: {e}")
         await update.message.reply_text(f"❌ Erro ao processar foto: {e}")
 
-async def notify_new_tasks(ctx: ContextTypes.DEFAULT_TYPE):
-    """Job periódico: notifica prestadores sobre tarefas recém-atribuídas."""
-    if not sb: return
-    try:
-        r = (sb.table("tasks").select("*")
-             .eq("provider_notified", False)
-             .not_.in_("status", ["cancelada"])
-             .execute())
-        tasks = r.data or []
-        for task in tasks:
-            # Marca notificado primeiro para não re-tentar em caso de erro
-            sb_update("tasks", {"provider_notified": True}, id=task["id"])
-            if not task.get("assignee_id"):
-                continue
-            prov = sb_one("providers", id=task["assignee_id"])
-            if not prov or not prov.get("chat_id"):
-                continue
-            urg = URG.get(task.get("urgency", ""), "")
-            sla = fmt_date(task.get("sla_deadline", ""))
-            msg = (
-                f"🔔 *Nova tarefa atribuída a você!*\n\n"
-                f"{urg} *#{task['id']}* — {task['title']}\n\n"
-                f"📝 {task.get('description') or '–'}\n"
-                f"👤 Solicitante: {task.get('requester', '')}\n"
-                f"🏢 Setor: {task.get('sector') or '–'}\n"
-                f"⏱ *Conclusão prevista (SLA):* {sla}\n\n"
-                f"_Use o menu abaixo para ver detalhes e iniciar a tarefa._"
-            )
-            kb = InlineKeyboardMarkup([[
-                InlineKeyboardButton("👁 Ver Tarefa", callback_data=f"view:{task['id']}"),
-                InlineKeyboardButton("🏠 Menu",       callback_data="menu"),
-            ]])
-            try:
-                await ctx.bot.send_message(
-                    chat_id=int(prov["chat_id"]),
-                    text=msg, parse_mode="Markdown", reply_markup=kb)
-                print(f"[notify] Tarefa #{task['id']} → {prov['name']}")
-            except Exception as e:
-                print(f"[notify] Erro ao notificar {prov.get('name')}: {e}")
-    except Exception as e:
-        print(f"[notify_new_tasks] {e}")
-
 async def cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     clear_wait(str(update.effective_chat.id))
     await update.effective_message.reply_text("Cancelado. Use /start para recomeçar.")
+
+# ── Job: notifica prestadores sobre novas tarefas ─────────────────────────────
+def _fetch_unnotified():
+    if not sb: return []
+    try:
+        return sb.table("tasks").select("*").eq("provider_notified", False).not_.in_("status", ["cancelada"]).execute().data or []
+    except: return []
+
+async def notify_new_tasks(ctx: ContextTypes.DEFAULT_TYPE):
+    tasks = await asyncio.to_thread(_fetch_unnotified)
+    for task in tasks:
+        await asyncio.to_thread(_sb_update, "tasks", {"provider_notified": True}, id=task["id"])
+        if not task.get("assignee_id"): continue
+        prov = await aone("providers", id=task["assignee_id"])
+        if not prov or not prov.get("chat_id"): continue
+        urg = URG.get(task.get("urgency", ""), "")
+        sla = fmt_date(task.get("sla_deadline", ""))
+        msg = (
+            f"🔔 *Nova tarefa atribuída a você!*\n\n"
+            f"{urg} *#{task['id']}* — {task['title']}\n\n"
+            f"📝 {task.get('description') or '–'}\n"
+            f"👤 Solicitante: {task.get('requester', '')}\n"
+            f"🏢 Setor: {task.get('sector') or '–'}\n"
+            f"⏱ *Conclusão prevista (SLA):* {sla}\n\n"
+            f"_Use o menu para ver detalhes e iniciar a tarefa._"
+        )
+        kb = InlineKeyboardMarkup([[
+            InlineKeyboardButton("👁 Ver Tarefa", callback_data=f"view:{task['id']}"),
+            InlineKeyboardButton("🏠 Menu",       callback_data="menu"),
+        ]])
+        try:
+            await ctx.bot.send_message(chat_id=int(prov["chat_id"]), text=msg, parse_mode="Markdown", reply_markup=kb)
+            print(f"[notify] Tarefa #{task['id']} → {prov['name']}")
+        except Exception as e:
+            print(f"[notify] Erro ao notificar {prov.get('name')}: {e}")
 
 # ── Run ───────────────────────────────────────────────────────────────────────
 def run_bot():
@@ -678,15 +680,17 @@ def run_bot():
     token = get_token()
     if not token or len(token) < 20: print("[BOT] ERRO: Token Telegram não configurado"); return
     print(f"[BOT] Iniciando... token: {token[:12]}...")
-    app = (ApplicationBuilder().token(token)
-           .read_timeout(30).write_timeout(30).connect_timeout(30).pool_timeout(30).build())
+    app = (ApplicationBuilder()
+           .token(token)
+           .concurrent_updates(True)   # processa múltiplos updates em paralelo
+           .read_timeout(30).write_timeout(30).connect_timeout(30).pool_timeout(30)
+           .build())
     app.add_handler(CommandHandler("start",  start))
     app.add_handler(CommandHandler("menu",   start))
     app.add_handler(CommandHandler("cancel", cancel))
     app.add_handler(CallbackQueryHandler(button))
-    app.add_handler(MessageHandler(filters.PHOTO,                       photo_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,     text_handler))
-    # Job: verifica novas tarefas e notifica prestadores a cada 30s
+    app.add_handler(MessageHandler(filters.PHOTO,                   photo_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
     app.job_queue.run_repeating(notify_new_tasks, interval=30, first=10)
     print("[BOT] Rodando.")
     app.run_polling(bootstrap_retries=-1, drop_pending_updates=True)
