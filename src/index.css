@@ -371,6 +371,37 @@ textarea.finput { resize: vertical; min-height: 80px; }
 .login-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
 .login-err { color: var(--red); font-size: .8rem; text-align: center; margin-top: .5rem; min-height: 1.2rem; }
 
+/* ── SETUP STEPS ──────────────────────────────────────── */
+.setup-steps { display: flex; flex-direction: column; gap: 0; }
+.setup-step {
+  display: flex; gap: 1rem; padding: 1rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.setup-step:last-child { border-bottom: none; }
+.step-num {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--blue), #1a7fe8);
+  color: #fff; font-weight: 700; font-size: .82rem;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: .1rem;
+  box-shadow: 0 2px 8px #3296ee44;
+}
+.step-body { flex: 1; }
+.step-title { font-size: .88rem; font-weight: 600; color: var(--text); margin-bottom: .3rem; }
+.step-desc  { font-size: .8rem; color: var(--muted); line-height: 1.65; }
+.step-desc code, .setup-code {
+  font-family: var(--mono); font-size: .75rem;
+  background: var(--s3); padding: .1rem .35rem;
+  border-radius: 4px; color: var(--blue2);
+}
+.setup-code { display: inline-block; margin: .3rem 0; word-break: break-all; }
+.bot-connected-badge {
+  display: inline-flex; align-items: center; gap: .4rem;
+  margin-top: .6rem; padding: .35rem .75rem;
+  background: #00d48a15; border: 1px solid #00d48a44;
+  border-radius: 20px; font-size: .8rem; color: var(--green);
+}
+
 /* ── BOT ──────────────────────────────────────────────── */
 .bot-status { display: flex; align-items: center; gap: .4rem; font-family: var(--mono); font-size: .73rem; padding: .3rem .7rem; background: #3296EE18; border: 1px solid #3296EE44; color: var(--blue); border-radius: 20px; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); animation: pulse 2s infinite; }
