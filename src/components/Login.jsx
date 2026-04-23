@@ -38,7 +38,7 @@ export default function Login({ onLogin, showToast }) {
           <div className="login-logo-wrap">
             <img src="/logo.png" alt="DespachaApp" className="login-logo-img" />
           </div>
-          <div className="login-sub">Gerenciamento de Tarefas Ágil</div>
+          <div className="login-sub" style={{ display: 'none' }}>Gerenciamento de Tarefas Ágil</div>
         </div>
         <form onSubmit={handleLogin}>
           <div className="login-field">
