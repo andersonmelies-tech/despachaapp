@@ -23,15 +23,10 @@ export default function Register({ onBack, onRegistered, showToast }) {
 
     setLoading(true); setErr('')
     try {
-      // 1. Criar empresa
-      const { data: comp, error: compErr } = await supabase
-        .from('companies')
-        .insert({ name: company.name.trim() })
-        .select()
-        .single()
+      // 1. Criar empresa via RPC segura (bypassa RLS para retornar o id)
+      const { data: company_id, error: compErr } = await supabase
+        .rpc('create_company', { company_name: company.name.trim() })
       if (compErr) throw new Error('Erro ao criar empresa: ' + compErr.message)
-
-      const company_id = comp.id
 
       // 2. Criar usuário admin com company_id no metadata
       const { data: authData, error: authErr } = await supabase.auth.signUp({

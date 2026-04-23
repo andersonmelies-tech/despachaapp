@@ -9,13 +9,12 @@ const TABS = [
   { id: 'users',     label: '👥 Usuários' },
 ]
 
-// ── Setup (ex-Geral + ex-Telegram unificados) ─────────────────────────────────
+// ── Setup — modelo de bot centralizado ───────────────────────────────────────
 function SetupPanel({ showToast }) {
-  const [cfg, setCfg]           = useState({})
-  const [company, setCompany]   = useState(null)
-  const [testing, setTesting]   = useState(false)
-  const [botInfo, setBotInfo]   = useState(null)
-  const [saving, setSaving]     = useState(false)
+  const [cfg,     setCfg]     = useState({})
+  const [company, setCompany] = useState(null)
+  const [saving,  setSaving]  = useState(false)
+  const [providers, setProviders] = useState([])
 
   useEffect(() => {
     supabase.from('config').select('*').then(r => {
@@ -23,71 +22,57 @@ function SetupPanel({ showToast }) {
     })
     supabase.from('companies').select('*').limit(1).single()
       .then(r => { if (r.data) setCompany(r.data) })
+    supabase.from('providers').select('*').eq('active', 1)
+      .then(r => setProviders(r.data || []))
   }, [])
 
   function copyCode() {
     if (!company?.invite_code) return
-    navigator.clipboard.writeText(company.invite_code)
-    showToast('Código copiado ✓')
+    navigator.clipboard.writeText(`/start ${company.invite_code}`)
+    showToast('Comando copiado ✓')
   }
 
-  function set(k, v) { setCfg(c => ({ ...c, [k]: v })) }
-
-  async function saveAll() {
+  async function saveName() {
     setSaving(true)
-    const keys = ['company_name', 'telegram_token', 'admin_chat_id']
-    await Promise.all(keys.map(k =>
-      supabase.from('config').upsert({ key: k, value: cfg[k] || '' })
-    ))
+    await supabase.from('config').upsert({ key: 'company_name', value: cfg.company_name || '' })
     setSaving(false)
-    showToast('Configurações salvas ✓')
+    showToast('Nome salvo ✓')
   }
 
-  async function testBot() {
-    const token = (cfg.telegram_token || '').trim()
-    if (!token) { showToast('Cole o token do bot primeiro', 'err'); return }
-    setTesting(true); setBotInfo(null)
-    try {
-      const r = await fetch(`https://api.telegram.org/bot${token}/getMe`)
-      const d = await r.json()
-      if (d.ok) {
-        setBotInfo(d.result)
-        showToast(`Bot @${d.result.username} conectado ✓`)
-      } else {
-        showToast('Token inválido: ' + (d.description || 'erro'), 'err')
-      }
-    } catch {
-      showToast('Erro de conexão com o Telegram', 'err')
-    }
-    setTesting(false)
-  }
-
-  const tokenOk = botInfo !== null
+  const linked   = providers.filter(p => p.chat_id).length
+  const unlinked = providers.filter(p => !p.chat_id).length
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-      {/* Dados da empresa */}
+      {/* Nome da empresa */}
       <div className="cfg-card">
         <div className="cfg-title">🏢 Dados da Empresa</div>
-        <div className="fg">
-          <label className="flabel">NOME DA EMPRESA / WORKSPACE</label>
-          <input className="finput" placeholder="Ex: Construtora XYZ" value={cfg.company_name || ''} onChange={e => set('company_name', e.target.value)} />
+        <div style={{ display: 'flex', gap: '.65rem', alignItems: 'flex-end' }}>
+          <div className="fg" style={{ flex: 1, margin: 0 }}>
+            <label className="flabel">NOME DA EMPRESA</label>
+            <input className="finput" placeholder="Ex: Construtora XYZ Ltda"
+              value={cfg.company_name || ''}
+              onChange={e => setCfg(c => ({ ...c, company_name: e.target.value }))} />
+          </div>
+          <button className="btn-primary" onClick={saveName} disabled={saving} style={{ flexShrink: 0 }}>
+            {saving ? 'Salvando…' : '💾 Salvar'}
+          </button>
         </div>
       </div>
 
-      {/* Telegram */}
+      {/* Como funciona */}
       <div className="cfg-card">
-        <div className="cfg-title">🤖 Bot Telegram — Passo a passo</div>
-
+        <div className="cfg-title">🤖 Como os prestadores usam o bot</div>
         <div className="setup-steps">
+
           <div className="setup-step">
             <div className="step-num">1</div>
             <div className="step-body">
-              <div className="step-title">Crie seu bot no Telegram</div>
+              <div className="step-title">Cadastre seus prestadores</div>
               <div className="step-desc">
-                Abra o Telegram, procure por <strong>@BotFather</strong> e envie o comando <code>/newbot</code>.
-                Escolha um nome e um username (deve terminar em <em>bot</em>). O BotFather vai te enviar o token.
+                Vá na aba <strong>👤 Prestadores</strong> e adicione cada prestador com o nome que ele usará.
+                O nome é usado para identificá-lo automaticamente no Telegram.
               </div>
             </div>
           </div>
@@ -95,24 +80,25 @@ function SetupPanel({ showToast }) {
           <div className="setup-step">
             <div className="step-num">2</div>
             <div className="step-body">
-              <div className="step-title">Cole o token aqui e teste</div>
-              <div style={{ display: 'flex', gap: '.6rem', marginTop: '.5rem', flexWrap: 'wrap' }}>
-                <input
-                  className="finput"
-                  style={{ flex: 1, minWidth: '220px' }}
-                  type="password"
-                  placeholder="123456789:AABBccDDeeffGGhh..."
-                  value={cfg.telegram_token || ''}
-                  onChange={e => { set('telegram_token', e.target.value); setBotInfo(null) }}
-                />
-                <button className="btn-sec" onClick={testBot} disabled={testing} style={{ flexShrink: 0 }}>
-                  {testing ? '⏳ Testando…' : '⚡ Testar conexão'}
-                </button>
+              <div className="step-title">Compartilhe o código de vinculação</div>
+              <div className="step-desc">
+                Envie o comando abaixo para cada prestador pelo WhatsApp ou Telegram.
+                Ele só precisa abrir o bot e enviar esse comando — pronto.
               </div>
-              {botInfo && (
-                <div className="bot-connected-badge">
-                  ✅ Bot <strong>@{botInfo.username}</strong> conectado — <em>{botInfo.first_name}</em>
+              {company?.invite_code ? (
+                <div className="invite-code-box">
+                  <div className="invite-code-label">Comando para o prestador enviar no bot:</div>
+                  <div className="invite-code-row">
+                    <code className="invite-code-val">/start {company.invite_code}</code>
+                    <button className="invite-code-copy" onClick={copyCode} title="Copiar">⎘ Copiar</button>
+                  </div>
+                  <div className="invite-code-hint">
+                    📱 O prestador abre o Telegram → busca <strong>@DespachaAppBot</strong> → envia esse comando.<br />
+                    O vínculo é automático — nenhuma configuração adicional necessária.
+                  </div>
                 </div>
+              ) : (
+                <div style={{ marginTop: '.5rem', fontSize: '.78rem', color: 'var(--muted)' }}>⏳ Carregando…</div>
               )}
             </div>
           </div>
@@ -120,63 +106,30 @@ function SetupPanel({ showToast }) {
           <div className="setup-step">
             <div className="step-num">3</div>
             <div className="step-body">
-              <div className="step-title">Descubra seu Chat ID para receber alertas</div>
+              <div className="step-title">Pronto — o bot funciona automaticamente</div>
               <div className="step-desc">
-                Envie qualquer mensagem para o seu bot. Depois acesse:<br />
-                <code className="setup-code">https://api.telegram.org/bot<em>SEU_TOKEN</em>/getUpdates</code><br />
-                Procure o campo <code>"id"</code> dentro de <code>"chat"</code> — esse é o seu Chat ID.
-              </div>
-              <div style={{ marginTop: '.6rem' }}>
-                <label className="flabel">MEU CHAT ID (para receber notificações)</label>
-                <input className="finput" placeholder="Ex: 123456789" value={cfg.admin_chat_id || ''} onChange={e => set('admin_chat_id', e.target.value)} />
+                Sempre que uma tarefa for atribuída ao prestador, ele recebe uma notificação no Telegram.
+                Ele pode ver detalhes, atualizar status e enviar fotos direto pelo bot.
               </div>
             </div>
           </div>
 
-          <div className="setup-step">
-            <div className="step-num">4</div>
-            <div className="step-body">
-              <div className="step-title">Convide seus prestadores para o bot</div>
-              <div className="step-desc">
-                Cadastre cada prestador na aba <strong>Prestadores</strong> com o nome exato.
-                Depois compartilhe o comando abaixo com eles no WhatsApp ou Telegram:
-              </div>
-              {company?.invite_code ? (
-                <div className="invite-code-box">
-                  <div className="invite-code-label">Comando que o prestador envia para o bot:</div>
-                  <div className="invite-code-row">
-                    <code className="invite-code-val">/start {company.invite_code}</code>
-                    <button className="invite-code-copy" onClick={copyCode} title="Copiar">⎘ Copiar</button>
-                  </div>
-                  <div className="invite-code-hint">
-                    O prestador abre o bot no Telegram, envia esse comando e é vinculado automaticamente.
-                  </div>
-                </div>
-              ) : (
-                <div style={{ marginTop: '.5rem', fontSize: '.78rem', color: 'var(--muted)' }}>
-                  ⏳ Carregando código…
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'flex-end' }}>
-          <button className="btn-primary" onClick={saveAll} disabled={saving}>
-            {saving ? 'Salvando…' : '💾 Salvar configurações'}
-          </button>
         </div>
       </div>
 
-      {/* Status geral */}
+      {/* Status dos prestadores */}
       <div className="cfg-card">
-        <div className="cfg-title">📊 Status da Integração</div>
+        <div className="cfg-title">📊 Status dos Prestadores</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
+          <StatusRow ok={linked > 0}    label={`${linked} prestador(es) vinculado(s) ao Telegram`} />
+          <StatusRow ok={unlinked === 0} label={unlinked === 0 ? 'Todos os prestadores vinculados' : `${unlinked} prestador(es) ainda não vinculado(s)`} />
           <StatusRow ok={!!(cfg.company_name)} label="Nome da empresa configurado" />
-          <StatusRow ok={!!(cfg.telegram_token)} label="Token do bot configurado" />
-          <StatusRow ok={tokenOk}               label="Conexão com bot verificada" />
-          <StatusRow ok={!!(cfg.admin_chat_id)} label="Chat ID do admin configurado" />
         </div>
+        {unlinked > 0 && (
+          <div style={{ marginTop: '.75rem', fontSize: '.78rem', color: 'var(--muted)' }}>
+            ⚠ Prestadores não vinculados: {providers.filter(p => !p.chat_id).map(p => p.name).join(', ')}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -386,10 +339,12 @@ function UsersPanel({ showToast, user: currentUser }) {
     if (f.password !== f.password2) return alert('As senhas não coincidem')
     if (f.password.length < 6) return alert('Senha mínimo 6 caracteres')
     setSaving(true)
+    // Herda o company_id do admin que está criando o usuário
+    const company_id = currentUser?.company_id
     const { error } = await supabase.auth.signUp({
       email: toEmail(f.username),
       password: f.password,
-      options: { data: { name: f.name, username: f.username, role: f.role } }
+      options: { data: { name: f.name, username: f.username, role: f.role, company_id } }
     })
     setSaving(false)
     if (error) { showToast('Erro: ' + error.message, 'err'); return }
