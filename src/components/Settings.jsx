@@ -24,6 +24,7 @@ const TABS = [
   { id: 'sectors',   label: '🏢 Setores' },
   { id: 'users',     label: '👥 Usuários' },
   { id: 'api',       label: '🔌 API / ERP' },
+  { id: 'branding',  label: '🎨 White-label' },
 ]
 
 // ── Setup — modelo de bot centralizado ───────────────────────────────────────
@@ -558,6 +559,99 @@ function UsersPanel({ showToast, user: currentUser, session }) {
   )
 }
 
+// ── Branding ───────────────────────────────────────────────────────────────
+function BrandingPanel({ showToast }) {
+  const [logoUrl,   setLogoUrl]   = useState('')
+  const [color,     setColor]     = useState('#3B82F6')
+  const [email,     setEmail]     = useState('')
+  const [saving,    setSaving]    = useState(false)
+  const [uploading, setUploading] = useState(false)
+
+  useEffect(() => {
+    supabase.from('config').select('*').then(r => {
+      const c = {}; (r.data || []).forEach(x => { c[x.key] = x.value })
+      if (c.brand_logo_url)      setLogoUrl(c.brand_logo_url)
+      if (c.brand_primary_color) setColor(c.brand_primary_color)
+      if (c.report_email)        setEmail(c.report_email)
+    })
+  }, [])
+
+  async function uploadLogo(e) {
+    const file = e.target.files[0]; if (!file) return
+    setUploading(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    const form = new FormData(); form.append('file', file)
+    const res = await fetch('/api/branding/upload', {
+      method: 'POST', headers: { Authorization: `Bearer ${session?.access_token}` }, body: form
+    })
+    const d = await res.json()
+    if (d.url) { setLogoUrl(d.url); showToast('Logo atualizada ✓') }
+    else showToast('Erro ao fazer upload', 'err')
+    setUploading(false)
+  }
+
+  async function saveSettings() {
+    setSaving(true)
+    await Promise.all([
+      supabase.from('config').upsert({ key: 'brand_primary_color', value: color }),
+      supabase.from('config').upsert({ key: 'report_email', value: email }),
+    ])
+    // Apply color immediately
+    document.documentElement.style.setProperty('--blue', color)
+    showToast('Configurações salvas ✓')
+    setSaving(false)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div className="cfg-card">
+        <div className="cfg-title">🖼 Logo da Empresa</div>
+        <div style={{ display:'flex', alignItems:'center', gap:'1.5rem', flexWrap:'wrap' }}>
+          {logoUrl
+            ? <img src={logoUrl} alt="Logo" style={{ height:64, borderRadius:8, border:'1px solid var(--border)', background:'#fff', padding:4 }} />
+            : <div style={{ width:64, height:64, borderRadius:8, background:'var(--s2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.5rem' }}>🏢</div>
+          }
+          <div>
+            <label className="btn-primary" style={{ cursor:'pointer', display:'inline-block' }}>
+              {uploading ? '⏳ Enviando…' : '📤 Upload Logo'}
+              <input type="file" accept="image/*" style={{ display:'none' }} onChange={uploadLogo} disabled={uploading} />
+            </label>
+            <div style={{ fontSize:'.75rem', color:'var(--muted)', marginTop:'.4rem' }}>PNG ou SVG. Recomendado: fundo transparente, mín. 200×200px</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="cfg-card">
+        <div className="cfg-title">🎨 Cor Principal</div>
+        <div style={{ display:'flex', alignItems:'center', gap:'1rem' }}>
+          <input type="color" value={color} onChange={e => setColor(e.target.value)}
+            style={{ width:48, height:48, border:'none', borderRadius:8, cursor:'pointer', background:'none' }} />
+          <div>
+            <div style={{ fontWeight:600, color:'var(--text)' }}>{color}</div>
+            <div style={{ fontSize:'.75rem', color:'var(--muted)' }}>Aplicado em botões, badges e destaques</div>
+          </div>
+          <div style={{ width:80, height:36, borderRadius:8, background:color, boxShadow:`0 0 16px ${color}44` }} />
+        </div>
+      </div>
+
+      <div className="cfg-card">
+        <div className="cfg-title">📧 E-mail para Relatório Semanal</div>
+        <div style={{ display:'flex', gap:'.65rem' }}>
+          <input className="finput" style={{ flex:1 }} type="email" placeholder="Ex: gerencia@suaempresa.com.br"
+            value={email} onChange={e => setEmail(e.target.value)} />
+        </div>
+        <div style={{ fontSize:'.75rem', color:'var(--muted)', marginTop:'.4rem' }}>
+          Toda segunda-feira às 8h você recebe um relatório com os dados da semana.
+        </div>
+      </div>
+
+      <button className="btn-primary" style={{ alignSelf:'flex-start' }} onClick={saveSettings} disabled={saving}>
+        {saving ? 'Salvando…' : '💾 Salvar Configurações'}
+      </button>
+    </div>
+  )
+}
+
 // ── Settings (main) ────────────────────────────────────────────────────────
 export default function Settings({ showToast, user, session }) {
   const [tab, setTab] = useState('setup')
@@ -577,6 +671,7 @@ export default function Settings({ showToast, user, session }) {
       {tab === 'sectors'   && <SectorsPanel    showToast={showToast} />}
       {tab === 'users'     && <UsersPanel      showToast={showToast} user={user} />}
       {tab === 'api'       && <ApiDocs         showToast={showToast} />}
+      {tab === 'branding'  && <BrandingPanel   showToast={showToast} />}
     </div>
   )
 }

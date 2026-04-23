@@ -331,7 +331,7 @@ function SectorTab({ tasks }) {
 
 // ── Tab 4 — Exportar ──────────────────────────────────────────────────────────
 
-function ExportTab({ tasks, providers }) {
+function ExportTab({ tasks, providers, period }) {
   function dlTasks() {
     exportCSV(tasks.map(taskToRow), 'tarefas.csv')
   }
@@ -748,7 +748,7 @@ export default function Reports({ showToast }) {
           {tab === 'overview'  && <OverviewTab  tasks={tasks} />}
           {tab === 'providers' && <ProviderTab  tasks={tasks} providers={providers} />}
           {tab === 'sectors'   && <SectorTab    tasks={tasks} />}
-          {tab === 'export'    && <ExportTab    tasks={tasks} providers={providers} />}
+          {tab === 'export'    && <ExportTab    tasks={tasks} providers={providers} period={period} />}
         </>
       )}
     </div>

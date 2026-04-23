@@ -48,6 +48,19 @@ export default function App() {
       .then(({ data }) => { if (data) setCompany(data) })
   }, [session])
 
+  // Carrega branding da empresa
+  useEffect(() => {
+    if (!session) return
+    supabase.from('config').select('key,value').in('key', ['brand_logo_url', 'brand_primary_color'])
+      .then(({ data }) => {
+        if (!data) return
+        const cfg = Object.fromEntries(data.map(r => [r.key, r.value]))
+        if (cfg.brand_primary_color) {
+          document.documentElement.style.setProperty('--blue', cfg.brand_primary_color)
+        }
+      })
+  }, [session])
+
   // Verifica retorno do Stripe
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
