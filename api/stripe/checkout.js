@@ -8,10 +8,16 @@ const SB_ANON     = process.env.SUPABASE_ANON_KEY
 const SB_SERVICE  = process.env.SUPABASE_SERVICE_KEY
 const APP_URL     = process.env.APP_URL || 'https://despachaapp.vercel.app'
 
-const PRICES = {
+const PRICES_MONTHLY = {
   starter:    'price_1TPRCsGsVnzNJmCnvEK08gWJ',
   pro:        'price_1TPRCuGsVnzNJmCnpHGEdWqL',
   enterprise: 'price_1TPRCvGsVnzNJmCncqhh6auF',
+}
+// IDs anuais: criar no Stripe e adicionar nas env vars do Vercel
+const PRICES_ANNUAL = {
+  starter:    process.env.STRIPE_PRICE_STARTER_ANNUAL,
+  pro:        process.env.STRIPE_PRICE_PRO_ANNUAL,
+  enterprise: process.env.STRIPE_PRICE_ENTERPRISE_ANNUAL,
 }
 
 const CORS = {
@@ -36,8 +42,12 @@ export default async function handler(req) {
   let body
   try { body = await req.json() } catch { return json({ error: 'Invalid JSON' }, 400) }
 
-  const { plan } = body
-  if (!PRICES[plan]) return json({ error: 'Invalid plan. Use: starter, pro, enterprise' }, 400)
+  const { plan, billing } = body
+  const isAnnual = billing === 'annual'
+  const PRICES = isAnnual ? PRICES_ANNUAL : PRICES_MONTHLY
+  if (!PRICES_MONTHLY[plan]) return json({ error: 'Invalid plan. Use: starter, pro, enterprise' }, 400)
+  const priceId = PRICES[plan]
+  if (!priceId) return json({ error: 'Plano anual não configurado. Use mensal.' }, 400)
 
   // Busca empresa via JWT do usuário
   const sb = createClient(SB_URL, SB_ANON, { global: { headers: { Authorization: `Bearer ${token}` } } })
@@ -75,7 +85,7 @@ export default async function handler(req) {
   // Cria Checkout Session
   const params = new URLSearchParams({
     customer:                            customerId,
-    'line_items[0][price]':              PRICES[plan],
+    'line_items[0][price]':              priceId,
     'line_items[0][quantity]':           '1',
     mode:                                'subscription',
     'metadata[company_id]':              String(company.id),

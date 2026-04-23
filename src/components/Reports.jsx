@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase, isOverdue } from '../lib/supabase.js'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -338,62 +340,294 @@ function ExportTab({ tasks, providers }) {
     exportCSV(tasks.filter(t => t.status === 'concluida').map(taskToRow), 'tarefas_concluidas.csv')
   }
 
+  const [companyName, setCompanyName] = useState('DespachaApp')
+  useEffect(() => {
+    supabase.from('config').select('value').eq('key','company_name').single()
+      .then(r => { if (r.data?.value) setCompanyName(r.data.value) })
+  }, [])
+
+  // ── PDF ──────────────────────────────────────────────────────────────────
+  async function buildPDFHeader(doc, title, period) {
+    const pageW = doc.internal.pageSize.getWidth()
+
+    // Fundo do cabeçalho
+    doc.setFillColor(8, 20, 38)
+    doc.rect(0, 0, pageW, 38, 'F')
+
+    // Logo (tenta carregar /icon.png como base64)
+    try {
+      const img = await loadImageBase64('/icon.png')
+      doc.addImage(img, 'PNG', 10, 6, 26, 26)
+    } catch {}
+
+    // Nome do app
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(15)
+    doc.setTextColor(255, 255, 255)
+    doc.text('DespachaApp', 40, 16)
+
+    // Gestão de Serviços
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(100, 116, 139)
+    doc.text('Gestão de Serviços', 40, 22)
+
+    // Nome da empresa (direita)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(226, 232, 240)
+    doc.text(companyName, pageW - 10, 16, { align: 'right' })
+
+    // Linha separadora
+    doc.setDrawColor(30, 51, 86)
+    doc.setLineWidth(0.5)
+    doc.line(0, 38, pageW, 38)
+
+    // Título do relatório
+    doc.setFillColor(13, 25, 41)
+    doc.rect(0, 38, pageW, 18, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+    doc.setTextColor(226, 232, 240)
+    doc.text(title, 10, 50)
+
+    // Período + data
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(100, 116, 139)
+    const now = new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+    doc.text(`Período: ${period}   |   Gerado em: ${now}`, pageW - 10, 50, { align: 'right' })
+
+    return 60 // Y inicial para o conteúdo
+  }
+
+  function loadImageBase64(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.width; canvas.height = img.height
+        canvas.getContext('2d').drawImage(img, 0, 0)
+        resolve(canvas.toDataURL('image/png'))
+      }
+      img.onerror = reject
+      img.src = src
+    })
+  }
+
+  const periodLabel = { hoje:'Hoje', '7d':'Últimos 7 dias', '30d':'Últimos 30 dias', '90d':'Últimos 90 dias', custom:'Personalizado' }
+
+  async function exportPDF_Tasks() {
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+    const startY = await buildPDFHeader(doc, 'Relatório de Tarefas', periodLabel[period] || period)
+
+    const rows = tasks.map(t => [
+      t.id, t.title || '', t.assignee || '', t.sector || '',
+      t.urgency || '', t.status?.replace('_',' ') || '',
+      fmt(t.due_date), fmt(t.created_at), fmt(t.completed_at),
+    ])
+
+    autoTable(doc, {
+      startY,
+      head: [['#', 'Título', 'Prestador', 'Setor', 'Urgência', 'Status', 'Prazo', 'Criado', 'Concluído']],
+      body: rows,
+      styles: { fontSize: 7.5, cellPadding: 2.5, textColor: [226,232,240], fillColor: [13,25,41] },
+      headStyles: { fillColor: [26,51,86], textColor: [226,232,240], fontStyle: 'bold', fontSize: 8 },
+      alternateRowStyles: { fillColor: [16,31,56] },
+      tableLineColor: [30,51,86], tableLineWidth: 0.2,
+      didDrawPage: (data) => {
+        // Footer em cada página
+        const pageH = doc.internal.pageSize.getHeight()
+        doc.setFontSize(7); doc.setTextColor(100,116,139)
+        doc.text(`DespachaApp · ${companyName} · Página ${data.pageNumber}`, 10, pageH - 6)
+        doc.text(`Confidencial`, doc.internal.pageSize.getWidth() - 10, pageH - 6, { align:'right' })
+      }
+    })
+
+    doc.save(`relatorio_tarefas_${new Date().toISOString().slice(0,10)}.pdf`)
+  }
+
+  async function exportPDF_Providers() {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+    const startY = await buildPDFHeader(doc, 'Relatório por Prestador', periodLabel[period] || period)
+
+    const rows = providers.map(p => {
+      const pt = tasks.filter(t => t.assignee === p.name)
+      const fin = pt.filter(t => t.elapsed_minutes)
+      const avgMin = fin.length ? Math.round(fin.reduce((a,t) => a + t.elapsed_minutes,0) / fin.length) : null
+      const conc = pt.filter(t => t.status === 'concluida').length
+      const pct = pt.length ? Math.round((conc/pt.length)*100) : 0
+      return [
+        p.name, p.sector || '',
+        pt.length, conc,
+        pt.filter(t => t.status==='em_andamento').length,
+        pt.filter(t => isOverdue(t)).length,
+        avgMin ? fmtHours(avgMin) : '—',
+        `${pct}%`,
+      ]
+    })
+
+    autoTable(doc, {
+      startY,
+      head: [['Prestador','Setor','Total','Concluídas','Andamento','Atrasadas','Tempo Médio','% Conclusão']],
+      body: rows,
+      styles: { fontSize: 8.5, cellPadding: 3, textColor: [226,232,240], fillColor: [13,25,41] },
+      headStyles: { fillColor: [26,51,86], textColor: [226,232,240], fontStyle:'bold' },
+      alternateRowStyles: { fillColor: [16,31,56] },
+      tableLineColor: [30,51,86], tableLineWidth: 0.2,
+      didDrawPage: (data) => {
+        const pageH = doc.internal.pageSize.getHeight()
+        doc.setFontSize(7); doc.setTextColor(100,116,139)
+        doc.text(`DespachaApp · ${companyName} · Página ${data.pageNumber}`, 10, pageH-6)
+      }
+    })
+    doc.save(`relatorio_prestadores_${new Date().toISOString().slice(0,10)}.pdf`)
+  }
+
+  async function exportPDF_Overview() {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+    const startY = await buildPDFHeader(doc, 'Visão Geral — Resumo Executivo', periodLabel[period] || period)
+
+    const total = tasks.length
+    const conc  = tasks.filter(t => t.status==='concluida').length
+    const atr   = tasks.filter(t => isOverdue(t)).length
+    const pend  = tasks.filter(t => t.status==='pendente').length
+    const and   = tasks.filter(t => t.status==='em_andamento').length
+    const fin   = tasks.filter(t => t.elapsed_minutes)
+    const avgMin = fin.length ? Math.round(fin.reduce((a,t)=>a+t.elapsed_minutes,0)/fin.length) : 0
+
+    // KPIs summary
+    autoTable(doc, {
+      startY,
+      head: [['Métrica','Valor']],
+      body: [
+        ['Total de Tarefas', total],
+        ['Concluídas', `${conc} (${total ? Math.round(conc/total*100) : 0}%)`],
+        ['Pendentes', pend],
+        ['Em Andamento', and],
+        ['Atrasadas', atr],
+        ['Tempo Médio de Conclusão', fmtHours(avgMin)],
+      ],
+      styles: { fontSize: 10, cellPadding: 4, textColor: [226,232,240], fillColor: [13,25,41] },
+      headStyles: { fillColor: [26,51,86], textColor: [226,232,240], fontStyle:'bold' },
+      alternateRowStyles: { fillColor: [16,31,56] },
+      tableLineColor: [30,51,86], tableLineWidth: 0.2,
+      columnStyles: { 0: { fontStyle:'bold' }, 1: { halign:'right' } },
+      didDrawPage: (data) => {
+        const pageH = doc.internal.pageSize.getHeight()
+        doc.setFontSize(7); doc.setTextColor(100,116,139)
+        doc.text(`DespachaApp · ${companyName} · Página ${data.pageNumber}`, 10, pageH-6)
+      }
+    })
+    doc.save(`resumo_executivo_${new Date().toISOString().slice(0,10)}.pdf`)
+  }
+
+  // ── XML ──────────────────────────────────────────────────────────────────
+  function exportXML() {
+    const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    const now = new Date().toISOString()
+    const lines = [
+      `<?xml version="1.0" encoding="UTF-8"?>`,
+      `<relatorio>`,
+      `  <empresa>${esc(companyName)}</empresa>`,
+      `  <gerado_em>${now}</gerado_em>`,
+      `  <periodo>${esc(periodLabel[period] || period)}</periodo>`,
+      `  <total_tarefas>${tasks.length}</total_tarefas>`,
+      `  <tarefas>`,
+      ...tasks.map(t => [
+        `    <tarefa>`,
+        `      <id>${t.id}</id>`,
+        `      <titulo>${esc(t.title)}</titulo>`,
+        `      <prestador>${esc(t.assignee)}</prestador>`,
+        `      <setor>${esc(t.sector)}</setor>`,
+        `      <urgencia>${esc(t.urgency)}</urgencia>`,
+        `      <status>${esc(t.status)}</status>`,
+        `      <prazo>${esc(t.due_date)}</prazo>`,
+        `      <criado_em>${esc(t.created_at)}</criado_em>`,
+        `      <concluido_em>${esc(t.completed_at)}</concluido_em>`,
+        `      <tempo_minutos>${t.elapsed_minutes ?? ''}</tempo_minutos>`,
+        `    </tarefa>`,
+      ].join('\n')),
+      `  </tarefas>`,
+      `</relatorio>`,
+    ]
+    const xml = lines.join('\n')
+    const blob = new Blob([xml], { type: 'application/xml;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url
+    a.download = `relatorio_${new Date().toISOString().slice(0,10)}.xml`
+    a.click(); URL.revokeObjectURL(url)
+  }
+
+  // ── CSV (mantém) ──────────────────────────────────────────────────────────
   function dlProviders() {
     const rows = providers.map(p => {
-      const pt = tasks.filter(t => t.assignee_id === p.id)
+      const pt = tasks.filter(t => t.assignee === p.name)
       const fin = pt.filter(t => t.elapsed_minutes)
       const avgMin = fin.length
-        ? Math.round(fin.reduce((a,t) => a + t.elapsed_minutes, 0) / fin.length)
-        : null
+        ? Math.round(fin.reduce((a,t) => a + t.elapsed_minutes, 0) / fin.length) : null
       const concluidas = pt.filter(t => t.status === 'concluida').length
       return {
-        'Prestador': p.name,
-        'Setor': p.sector || '',
-        'Total': pt.length,
-        'Concluídas': concluidas,
-        'Em andamento': pt.filter(t => t.status === 'em_andamento').length,
+        'Prestador': p.name, 'Setor': p.sector || '',
+        'Total': pt.length, 'Concluídas': concluidas,
+        'Em andamento': pt.filter(t => t.status==='em_andamento').length,
         'Atrasadas': pt.filter(t => isOverdue(t)).length,
         'Tempo médio (min)': avgMin ?? '',
-        '% Conclusão': pt.length ? Math.round((concluidas / pt.length) * 100) : 0,
+        '% Conclusão': pt.length ? Math.round((concluidas/pt.length)*100) : 0,
       }
     })
     exportCSV(rows, 'relatorio_prestadores.csv')
   }
 
-  const btns = [
-    { label: '📥 Todas as tarefas',        desc: `${tasks.length} tarefas com todos os campos`,                fn: dlTasks },
-    { label: '✅ Tarefas concluídas',       desc: `${tasks.filter(t=>t.status==='concluida').length} tarefas concluídas`, fn: dlDone },
-    { label: '👤 Relatório por prestador',  desc: `${providers.length} prestadores com métricas`,              fn: dlProviders },
+  const exportGroups = [
+    {
+      title: '📄 PDF — Com logo e nome da empresa',
+      color: '#F43F5E',
+      items: [
+        { label: 'Resumo Executivo',       desc: 'KPIs gerais, taxa de conclusão, tempo médio',              fn: exportPDF_Overview  },
+        { label: 'Todas as Tarefas',       desc: `${tasks.length} tarefas · tabela completa (landscape)`,   fn: exportPDF_Tasks     },
+        { label: 'Relatório por Prestador',desc: `${providers.length} prestadores com métricas de desempenho`, fn: exportPDF_Providers },
+      ]
+    },
+    {
+      title: '🗂️ XML — Para integração com sistemas',
+      color: 'var(--purple)',
+      items: [
+        { label: 'Exportar tarefas em XML', desc: `${tasks.length} tarefas · estrutura padronizada UTF-8`, fn: exportXML },
+      ]
+    },
+    {
+      title: '📊 CSV — Para Excel e planilhas',
+      color: 'var(--green)',
+      items: [
+        { label: 'Todas as tarefas',         desc: `${tasks.length} tarefas com todos os campos`, fn: dlTasks       },
+        { label: 'Tarefas concluídas',        desc: `${tasks.filter(t=>t.status==='concluida').length} tarefas concluídas`, fn: dlDone },
+        { label: 'Relatório por prestador',   desc: `${providers.length} prestadores com métricas`, fn: dlProviders  },
+      ]
+    },
   ]
 
   return (
-    <div>
-      <div className="cfg-card" style={{ marginBottom: '1rem' }}>
-        <div className="cfg-title">📤 Exportar CSV</div>
-        <div style={{ fontSize: '.82rem', color: 'var(--muted)', marginBottom: '1rem' }}>
-          Os dados exportados correspondem ao período selecionado no filtro acima.
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
-          {btns.map(b => (
-            <div key={b.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '.75rem 1rem', background: 'var(--s3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: '.88rem' }}>{b.label}</div>
-                <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginTop: '.2rem' }}>{b.desc}</div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {exportGroups.map(group => (
+        <div key={group.title} className="cfg-card" style={{ borderTop: `2px solid ${group.color}` }}>
+          <div className="cfg-title" style={{ color: group.color, marginBottom: '.75rem' }}>{group.title}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
+            {group.items.map(b => (
+              <div key={b.label} className="export-row">
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '.88rem' }}>{b.label}</div>
+                  <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginTop: '.15rem' }}>{b.desc}</div>
+                </div>
+                <button className="btn-primary" style={{ flexShrink: 0, background: group.color, border: 'none' }} onClick={b.fn}>
+                  ↓ Download
+                </button>
               </div>
-              <button className="btn-primary" onClick={b.fn}>Download</button>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
-
-      <div className="cfg-card">
-        <div className="cfg-title">Colunas exportadas (tarefas)</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.4rem' }}>
-          {['ID','Título','Prestador','Setor','Urgência','Status','Prazo','Criado em','Concluído em','Tempo (min)'].map(c => (
-            <span key={c} style={{ background: 'var(--s3)', border: '1px solid var(--border)', padding: '.2rem .6rem', borderRadius: '20px', fontSize: '.75rem', fontFamily: 'var(--mono)', color: 'var(--muted)' }}>{c}</span>
-          ))}
-        </div>
-      </div>
+      ))}
     </div>
   )
 }

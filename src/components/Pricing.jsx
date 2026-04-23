@@ -1,75 +1,100 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 
+// ── IDs dos preços no Stripe ────────────────────────────────────────────────
+// Mensal
+const PRICES_MONTHLY = {
+  starter:    'price_1TPRCsGsVnzNJmCnvEK08gWJ',
+  pro:        'price_1TPRCuGsVnzNJmCnpHGEdWqL',
+  enterprise: 'price_1TPRCvGsVnzNJmCncqhh6auF',
+}
+// Anual — criar no Stripe Dashboard e substituir abaixo
+const PRICES_ANNUAL = {
+  starter:    import.meta.env.VITE_STRIPE_PRICE_STARTER_ANNUAL    || 'price_annual_starter_placeholder',
+  pro:        import.meta.env.VITE_STRIPE_PRICE_PRO_ANNUAL        || 'price_annual_pro_placeholder',
+  enterprise: import.meta.env.VITE_STRIPE_PRICE_ENTERPRISE_ANNUAL || 'price_annual_enterprise_placeholder',
+}
+
+// ── Planos ──────────────────────────────────────────────────────────────────
 const PLANS = [
   {
-    id:       'starter',
-    name:     'Starter',
-    price:    'R$ 97',
-    period:   '/mês',
-    color:    'var(--blue)',
-    badge:    null,
+    id:    'starter',
+    name:  'Starter',
+    color: 'var(--blue)',
+    badge: null,
+    monthly:     { price: 97,  display: 'R$ 97',  period: '/mês' },
+    annual:      { price: 78,  display: 'R$ 78',  period: '/mês', total: 'R$ 936/ano', saving: 'Economize R$ 228' },
     features: [
-      '✅ Até 3 usuários',
-      '✅ Até 5 prestadores',
-      '✅ Tarefas ilimitadas',
-      '✅ Bot Telegram',
-      '✅ Calendário e Dashboard',
-      '❌ API / Integrações ERP',
-      '❌ Relatórios avançados',
-      '❌ Suporte prioritário',
+      { ok: true,  text: 'Até 3 usuários'             },
+      { ok: true,  text: 'Até 5 prestadores'          },
+      { ok: true,  text: 'Tarefas ilimitadas'         },
+      { ok: true,  text: 'Bot Telegram'               },
+      { ok: true,  text: 'Calendário e Dashboard'     },
+      { ok: false, text: 'API / Integrações ERP'      },
+      { ok: false, text: 'Relatórios avançados'       },
+      { ok: false, text: 'Suporte prioritário'        },
     ],
   },
   {
-    id:       'pro',
-    name:     'Pro',
-    price:    'R$ 197',
-    period:   '/mês',
-    color:    'var(--orange)',
-    badge:    '⭐ Mais popular',
+    id:    'pro',
+    name:  'Pro',
+    color: 'var(--orange)',
+    badge: '⭐ Mais popular',
+    monthly:     { price: 197, display: 'R$ 197', period: '/mês' },
+    annual:      { price: 158, display: 'R$ 158', period: '/mês', total: 'R$ 1.896/ano', saving: 'Economize R$ 468' },
     features: [
-      '✅ Usuários ilimitados',
-      '✅ Prestadores ilimitados',
-      '✅ Tarefas ilimitadas',
-      '✅ Bot Telegram',
-      '✅ API REST para ERP',
-      '✅ Relatórios + Exportação CSV',
-      '✅ Suporte via WhatsApp',
-      '❌ White-label',
+      { ok: true,  text: 'Usuários ilimitados'        },
+      { ok: true,  text: 'Prestadores ilimitados'     },
+      { ok: true,  text: 'Tarefas ilimitadas'         },
+      { ok: true,  text: 'Bot Telegram'               },
+      { ok: true,  text: 'API REST para ERP'          },
+      { ok: true,  text: 'Relatórios + PDF/XML'       },
+      { ok: true,  text: 'Suporte via WhatsApp'       },
+      { ok: false, text: 'White-label'                },
     ],
   },
   {
-    id:       'enterprise',
-    name:     'Enterprise',
-    price:    'R$ 497',
-    period:   '/mês',
-    color:    'var(--purple)',
-    badge:    '🏢 Para grandes equipes',
+    id:    'enterprise',
+    name:  'Enterprise',
+    color: 'var(--purple)',
+    badge: '🏢 Para grandes equipes',
+    monthly:     { price: 497, display: 'R$ 497', period: '/mês' },
+    annual:      { price: 398, display: 'R$ 398', period: '/mês', total: 'R$ 4.776/ano', saving: 'Economize R$ 1.188' },
     features: [
-      '✅ Tudo do Pro',
-      '✅ White-label (sua logo)',
-      '✅ Domínio personalizado',
-      '✅ SLA customizado',
-      '✅ Relatório PDF automático',
-      '✅ Onboarding dedicado',
-      '✅ Suporte prioritário 24/7',
-      '✅ Contrato personalizado',
+      { ok: true,  text: 'Tudo do Pro'                },
+      { ok: true,  text: 'White-label (sua logo)'     },
+      { ok: true,  text: 'Domínio personalizado'      },
+      { ok: true,  text: 'SLA customizado'            },
+      { ok: true,  text: 'Relatório PDF automático'   },
+      { ok: true,  text: 'Onboarding dedicado'        },
+      { ok: true,  text: 'Suporte prioritário 24/7'   },
+      { ok: true,  text: 'Contrato personalizado'     },
     ],
   },
 ]
 
 export default function Pricing({ session, trialDaysLeft, onSuccess }) {
+  const [billing, setBilling] = useState('monthly') // 'monthly' | 'annual'
   const [loading, setLoading] = useState(null)
   const [error,   setError]   = useState('')
+
+  const isAnnual = billing === 'annual'
 
   async function subscribe(planId) {
     setLoading(planId); setError('')
     try {
       const token = session?.access_token
+      const priceId = isAnnual ? PRICES_ANNUAL[planId] : PRICES_MONTHLY[planId]
+
+      if (priceId.includes('placeholder')) {
+        setError('Plano anual ainda não configurado. Use o plano mensal ou contate o suporte.')
+        setLoading(null); return
+      }
+
       const res = await fetch('/api/stripe/checkout', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body:    JSON.stringify({ plan: planId }),
+        body:    JSON.stringify({ plan: planId, billing }),
       })
       const data = await res.json()
       if (data.url) {
@@ -77,7 +102,7 @@ export default function Pricing({ session, trialDaysLeft, onSuccess }) {
       } else {
         setError(data.error || 'Erro ao iniciar pagamento')
       }
-    } catch (e) {
+    } catch {
       setError('Erro de conexão. Tente novamente.')
     }
     setLoading(null)
@@ -105,36 +130,86 @@ export default function Pricing({ session, trialDaysLeft, onSuccess }) {
           )}
         </div>
 
+        {/* Toggle mensal / anual */}
+        <div className="pricing-toggle-wrap">
+          <button
+            className={`ptoggle-btn${!isAnnual ? ' active' : ''}`}
+            onClick={() => setBilling('monthly')}
+          >Mensal</button>
+          <button
+            className={`ptoggle-btn${isAnnual ? ' active' : ''}`}
+            onClick={() => setBilling('annual')}
+          >
+            Anual
+            <span className="ptoggle-save">20% OFF</span>
+          </button>
+        </div>
+        {isAnnual && (
+          <div className="pricing-annual-note">
+            💡 Cobrado anualmente em parcela única · Equivale a <strong>2 meses grátis</strong>
+          </div>
+        )}
+
         {/* Cards */}
         <div className="pricing-grid">
-          {PLANS.map(plan => (
-            <div key={plan.id} className={`plan-card${plan.badge ? ' plan-featured' : ''}`}
-                 style={{ '--plan-color': plan.color }}>
-              {plan.badge && <div className="plan-badge">{plan.badge}</div>}
-              <div className="plan-name">{plan.name}</div>
-              <div className="plan-price">
-                {plan.price}<span className="plan-period">{plan.period}</span>
-              </div>
-              <ul className="plan-features">
-                {plan.features.map((f, i) => <li key={i}>{f}</li>)}
-              </ul>
-              <button
-                className={`plan-btn${plan.badge ? ' plan-btn-featured' : ''}`}
-                onClick={() => subscribe(plan.id)}
-                disabled={loading === plan.id}
-                style={plan.badge ? { background: plan.color } : {}}
+          {PLANS.map(plan => {
+            const info = isAnnual ? plan.annual : plan.monthly
+            return (
+              <div key={plan.id}
+                className={`plan-card${plan.badge ? ' plan-featured' : ''}`}
+                style={{ '--plan-color': plan.color }}
               >
-                {loading === plan.id ? '⏳ Redirecionando…' : 'Assinar agora →'}
-              </button>
-            </div>
-          ))}
+                {plan.badge && <div className="plan-badge">{plan.badge}</div>}
+                <div className="plan-name">{plan.name}</div>
+
+                <div className="plan-price-wrap">
+                  <div className="plan-price">
+                    {info.display}
+                    <span className="plan-period">{info.period}</span>
+                  </div>
+                  {isAnnual && (
+                    <div className="plan-annual-detail">
+                      <span className="plan-total">{info.total}</span>
+                      <span className="plan-saving">{info.saving}</span>
+                    </div>
+                  )}
+                  {!isAnnual && (
+                    <div className="plan-monthly-hint">
+                      ou <strong>12x R$ {plan.annual.price},00/mês</strong> no anual
+                    </div>
+                  )}
+                </div>
+
+                <ul className="plan-features">
+                  {plan.features.map((f, i) => (
+                    <li key={i} style={{ color: f.ok ? 'var(--text)' : 'var(--dim)' }}>
+                      <span>{f.ok ? '✅' : '❌'}</span> {f.text}
+                    </li>
+                  ))}
+                </ul>
+
+                <button
+                  className={`plan-btn${plan.badge ? ' plan-btn-featured' : ''}`}
+                  onClick={() => subscribe(plan.id)}
+                  disabled={loading === plan.id}
+                  style={plan.badge ? { background: plan.color } : {}}
+                >
+                  {loading === plan.id
+                    ? '⏳ Redirecionando…'
+                    : isAnnual
+                      ? `Assinar anual →`
+                      : `Assinar mensal →`}
+                </button>
+              </div>
+            )
+          })}
         </div>
 
         {error && <div className="pricing-error">⚠ {error}</div>}
 
         <div className="pricing-footer">
           🔒 Pagamento seguro via Stripe &nbsp;·&nbsp; Cancele quando quiser &nbsp;·&nbsp;
-          Sem taxa de cancelamento
+          Sem taxa de cancelamento &nbsp;·&nbsp; Nota fiscal disponível
         </div>
       </div>
     </div>
