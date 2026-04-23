@@ -303,49 +303,81 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user    = update.effective_user
     clear_wait(chat_id)
 
-    # Deep link: /start <invite_code> — vincula prestador à empresa pelo código
-    invite_code = None
-    if ctx.args:
-        invite_code = ctx.args[0].strip()
+    # Deep link: /start CODIGO  ou  /start CODIGO_IDPRESTADOR
+    # Formato com ID: vínculo direto sem pedir nome (gerado pelo painel admin)
+    raw_param    = ctx.args[0].strip() if ctx.args else None
+    invite_code  = None
+    direct_prov_id = None
+    if raw_param:
+        # invite_code são os 8 primeiros chars hex (sem underscore)
+        # se houver '_', o que vem depois é o provider_id
+        if "_" in raw_param:
+            parts = raw_param.split("_", 1)
+            invite_code    = parts[0]
+            direct_prov_id = int(parts[1]) if parts[1].isdigit() else None
+        else:
+            invite_code = raw_param
 
+    # ── Caso 1: link direto com provider_id embutido ─────────────────────────
+    if direct_prov_id and sb:
+        try:
+            r = sb.table("providers").select("*").eq("id", direct_prov_id).eq("active", 1).limit(1).execute()
+            p = r.data[0] if r.data else None
+        except: p = None
+        if p:
+            await aupd("providers", {"chat_id": chat_id}, id=p["id"])
+            invalidate_prov_cache(chat_id)
+            provider = await get_prov(chat_id)
+            await update.effective_message.reply_text(
+                f"✅ Vinculado com sucesso!\n\n"
+                f"👷 Olá, *{p['name']}*!\n🏢 Setor: {p.get('sector') or '–'}\n\n"
+                f"Você receberá notificações das suas tarefas por aqui. Escolha uma opção:",
+                parse_mode="Markdown", reply_markup=main_kb())
+            return
+
+    # ── Caso 2: prestador já vinculado ───────────────────────────────────────
     provider = await get_prov(chat_id)
-    if not provider:
-        # Resolve company_id pelo invite_code (se fornecido)
-        invite_company_id = None
-        if invite_code and sb:
-            try:
-                r = sb.table("companies").select("id").eq("invite_code", invite_code).eq("active", True).limit(1).execute()
-                if r.data: invite_company_id = r.data[0]["id"]
-            except: pass
-
-        # Tenta vincular pelo nome do Telegram
-        fn = (user.first_name or "").strip()
-        ln = (user.last_name  or "").strip()
-        for nm in [f"{fn} {ln}".strip(), fn, ln]:
-            if nm:
-                if not sb: break
-                try:
-                    q = sb.table("providers").select("*").ilike("name", f"%{nm}%").eq("active", 1)
-                    if invite_company_id:
-                        q = q.eq("company_id", invite_company_id)
-                    r = q.limit(1).execute()
-                    p = r.data[0] if r.data else None
-                except: p = None
-                if p:
-                    await aupd("providers", {"chat_id": chat_id}, id=p["id"])
-                    invalidate_prov_cache(chat_id)
-                    provider = await get_prov(chat_id)
-                    break
     if provider:
         await update.effective_message.reply_text(
             f"👷 Olá, *{provider['name']}*!\n🏢 Setor: {provider.get('sector') or '–'}\n\nEscolha uma opção:",
             parse_mode="Markdown", reply_markup=main_kb())
-    else:
-        set_wait(chat_id, "name", extra={"invite_code": invite_code} if invite_code else None)
-        await update.effective_message.reply_text(
-            "👷 Bem-vindo ao *DespachaApp*!\n\nVocê não está vinculado como prestador.\n"
-            "Digite seu *nome completo* exatamente como cadastrado no sistema:",
-            parse_mode="Markdown")
+        return
+
+    # ── Caso 3: ainda não vinculado — resolve empresa pelo invite_code ────────
+    invite_company_id = None
+    if invite_code and sb:
+        try:
+            r = sb.table("companies").select("id").eq("invite_code", invite_code).eq("active", True).limit(1).execute()
+            if r.data: invite_company_id = r.data[0]["id"]
+        except: pass
+
+    # Tenta vincular automaticamente pelo nome do Telegram
+    fn = (user.first_name or "").strip()
+    ln = (user.last_name  or "").strip()
+    for nm in [f"{fn} {ln}".strip(), fn, ln]:
+        if nm and sb:
+            try:
+                q = sb.table("providers").select("*").ilike("name", f"%{nm}%").eq("active", 1)
+                if invite_company_id:
+                    q = q.eq("company_id", invite_company_id)
+                r = q.limit(1).execute()
+                p = r.data[0] if r.data else None
+            except: p = None
+            if p:
+                await aupd("providers", {"chat_id": chat_id}, id=p["id"])
+                invalidate_prov_cache(chat_id)
+                provider = await get_prov(chat_id)
+                await update.effective_message.reply_text(
+                    f"✅ Vinculado com sucesso!\n\n"
+                    f"👷 Olá, *{provider['name']}*!\nEscolha uma opção:",
+                    parse_mode="Markdown", reply_markup=main_kb())
+                return
+
+    # Não encontrou — pede nome manualmente
+    set_wait(chat_id, "name", extra={"invite_code": invite_code} if invite_code else None)
+    await update.effective_message.reply_text(
+        "👷 Bem-vindo ao *DespachaApp*!\n\nDigite seu *nome completo* exatamente como cadastrado no sistema:",
+        parse_mode="Markdown")
 
 async def show_list(q, tasks, title):
     if not tasks:

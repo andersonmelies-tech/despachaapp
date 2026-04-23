@@ -454,6 +454,30 @@ textarea.finput { resize: vertical; min-height: 80px; }
 .invite-code-copy:hover { background: var(--blue); color: #fff; }
 .invite-code-hint { font-size: .75rem; color: var(--muted); margin-top: .5rem; line-height: 1.5; }
 
+/* ── INVITE SHARE BUTTONS ─────────────────────────────── */
+.invite-share-btns {
+  display: flex; gap: .55rem; margin-top: .65rem; flex-wrap: wrap;
+}
+.invite-share-btn {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .4rem .9rem; border-radius: var(--radius-sm);
+  font-size: .8rem; font-weight: 600; text-decoration: none;
+  cursor: pointer; transition: all .15s; border: none;
+}
+.invite-share-btn.wa {
+  background: #25D366; color: #fff;
+}
+.invite-share-btn.wa:hover { background: #1ebe5d; }
+.invite-share-btn.tg {
+  background: #2AABEE; color: #fff;
+}
+.invite-share-btn.tg:hover { background: #1a9ddf; }
+
+.abtn.invite-wa { color: #25D366; }
+.abtn.invite-wa:hover { background: #25D36622; }
+.abtn.invite-cp { color: var(--blue); }
+.abtn.invite-cp:hover { background: var(--blue1); }
+
 /* ── MOBILE NAV ───────────────────────────────────────── */
 .mobile-nav { display: none; }
 

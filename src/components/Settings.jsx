@@ -1,6 +1,21 @@
 import { useState, useEffect } from 'react'
 import { supabase, toEmail } from '../lib/supabase.js'
 
+// Username do bot centralizado (configure VITE_BOT_USERNAME no Vercel)
+const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME || 'DespachaAppBot'
+
+function makeInviteLink(inviteCode, providerId) {
+  const param = providerId ? `${inviteCode}_${providerId}` : inviteCode
+  return `https://t.me/${BOT_USERNAME}?start=${param}`
+}
+
+function makeWhatsappShare(link, providerName, companyName) {
+  const text = providerName
+    ? `Olá ${providerName}! 👷\nClique no link abaixo para se vincular ao sistema de tarefas *${companyName || 'DespachaApp'}*:\n${link}`
+    : `Clique no link para acessar o bot do *${companyName || 'DespachaApp'}*:\n${link}`
+  return `https://wa.me/?text=${encodeURIComponent(text)}`
+}
+
 const TABS = [
   { id: 'setup',     label: '🚀 Configuração' },
   { id: 'providers', label: '👤 Prestadores' },
@@ -26,10 +41,10 @@ function SetupPanel({ showToast }) {
       .then(r => setProviders(r.data || []))
   }, [])
 
-  function copyCode() {
+  function copyLink() {
     if (!company?.invite_code) return
-    navigator.clipboard.writeText(`/start ${company.invite_code}`)
-    showToast('Comando copiado ✓')
+    navigator.clipboard.writeText(makeInviteLink(company.invite_code))
+    showToast('Link copiado ✓')
   }
 
   async function saveName() {
@@ -85,19 +100,31 @@ function SetupPanel({ showToast }) {
                 Envie o comando abaixo para cada prestador pelo WhatsApp ou Telegram.
                 Ele só precisa abrir o bot e enviar esse comando — pronto.
               </div>
-              {company?.invite_code ? (
-                <div className="invite-code-box">
-                  <div className="invite-code-label">Comando para o prestador enviar no bot:</div>
-                  <div className="invite-code-row">
-                    <code className="invite-code-val">/start {company.invite_code}</code>
-                    <button className="invite-code-copy" onClick={copyCode} title="Copiar">⎘ Copiar</button>
+              {company?.invite_code ? (() => {
+                const link = makeInviteLink(company.invite_code)
+                const waLink = makeWhatsappShare(link, null, cfg.company_name)
+                return (
+                  <div className="invite-code-box">
+                    <div className="invite-code-label">Link de acesso ao bot (geral da empresa):</div>
+                    <div className="invite-code-row">
+                      <code className="invite-code-val">{link}</code>
+                      <button className="invite-code-copy" onClick={copyLink} title="Copiar">⎘ Copiar</button>
+                    </div>
+                    <div className="invite-share-btns">
+                      <a className="invite-share-btn wa" href={waLink} target="_blank" rel="noopener noreferrer">
+                        <span>📱</span> Compartilhar no WhatsApp
+                      </a>
+                      <a className="invite-share-btn tg" href={link} target="_blank" rel="noopener noreferrer">
+                        <span>✈️</span> Abrir no Telegram
+                      </a>
+                    </div>
+                    <div className="invite-code-hint">
+                      O prestador clica no link → Telegram abre → já fica vinculado automaticamente.
+                      Nenhuma digitação necessária.
+                    </div>
                   </div>
-                  <div className="invite-code-hint">
-                    📱 O prestador abre o Telegram → busca <strong>@DespachaAppBot</strong> → envia esse comando.<br />
-                    O vínculo é automático — nenhuma configuração adicional necessária.
-                  </div>
-                </div>
-              ) : (
+                )
+              })() : (
                 <div style={{ marginTop: '.5rem', fontSize: '.78rem', color: 'var(--muted)' }}>⏳ Carregando…</div>
               )}
             </div>
@@ -148,19 +175,35 @@ function StatusRow({ ok, label }) {
 function ProvidersPanel({ showToast }) {
   const [providers, setProviders] = useState([])
   const [sectors,   setSectors]   = useState([])
+  const [company,   setCompany]   = useState(null)
   const [modal,     setModal]     = useState(false)
   const [editing,   setEditing]   = useState(null)
   const [f, setF] = useState({ name: '', sector: '', active: 1, chat_id: '' })
 
   async function load() {
-    const [pr, sr] = await Promise.all([
+    const [pr, sr, co] = await Promise.all([
       supabase.from('providers').select('*').order('name'),
       supabase.from('sectors').select('*').eq('active', 1).order('name'),
+      supabase.from('companies').select('*').limit(1).single(),
     ])
     setProviders(pr.data || [])
     setSectors(sr.data || [])
+    if (co.data) setCompany(co.data)
   }
   useEffect(() => { load() }, [])
+
+  function sendInvite(p) {
+    if (!company?.invite_code) { showToast('Carregando dados…'); return }
+    const link  = makeInviteLink(company.invite_code, p.id)
+    const waUrl = makeWhatsappShare(link, p.name, company.name)
+    window.open(waUrl, '_blank')
+  }
+
+  function copyInvite(p) {
+    if (!company?.invite_code) return
+    navigator.clipboard.writeText(makeInviteLink(company.invite_code, p.id))
+    showToast(`Link de ${p.name} copiado ✓`)
+  }
 
   function openNew()  { setEditing(null); setF({ name: '', sector: '', active: 1, chat_id: '' }); setModal(true) }
   function openEdit(p) { setEditing(p); setF({ name: p.name, sector: p.sector || '', active: p.active, chat_id: p.chat_id || '' }); setModal(true) }
@@ -196,10 +239,16 @@ function ProvidersPanel({ showToast }) {
                 {!p.active && <span style={{ color: 'var(--muted)', fontSize: '.72rem', marginLeft: '.4rem' }}>(inativo)</span>}
               </div>
               <div className={`provider-meta${p.chat_id ? ' chat-linked' : ''}`}>
-                {p.sector || 'Sem setor'} {p.chat_id ? ' · 🔗 Telegram vinculado' : ' · ⚠ Telegram não vinculado'}
+                {p.sector || 'Sem setor'} {p.chat_id ? ' · 🔗 Telegram vinculado' : ' · ⚠ Não vinculado'}
               </div>
             </div>
-            <div className="actions">
+            <div className="actions" style={{ display: 'flex', gap: '.35rem', alignItems: 'center' }}>
+              {!p.chat_id && (
+                <>
+                  <button className="abtn invite-wa" title="Enviar convite pelo WhatsApp" onClick={() => sendInvite(p)}>📱</button>
+                  <button className="abtn invite-cp" title="Copiar link de convite" onClick={() => copyInvite(p)}>🔗</button>
+                </>
+              )}
               <button className="abtn" onClick={() => openEdit(p)}>✏</button>
               <button className="abtn r" onClick={() => del(p.id)}>🗑</button>
             </div>
