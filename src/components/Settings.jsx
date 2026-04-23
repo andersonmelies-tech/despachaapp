@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase, toEmail } from '../lib/supabase.js'
 
 // Username do bot centralizado (configure VITE_BOT_USERNAME no Vercel)
-const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME || 'despachaapp'
+const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME || 'despachaapp_bot'
 
 function makeInviteLink(inviteCode, providerId) {
   const param = providerId ? `${inviteCode}_${providerId}` : inviteCode
