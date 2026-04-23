@@ -104,11 +104,11 @@ export default function App() {
     <>
       <Topbar user={meta} onLogout={() => supabase.auth.signOut()} />
 
-      {/* Banner de trial */}
-      {company?.plan === 'trial' && (
+      {/* Banner de trial — mostra quando ainda não é assinante ativo */}
+      {company && plan !== 'active' && (
         <TrialBanner
           daysLeft={daysLeft}
-          plan={company?.plan}
+          plan={plan === 'trialing' ? 'trial' : plan}
           onUpgrade={() => setShowPricing(true)}
         />
       )}
