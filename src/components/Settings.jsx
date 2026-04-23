@@ -380,53 +380,126 @@ function SectorsPanel({ showToast }) {
 }
 
 // ── Users ──────────────────────────────────────────────────────────────────
-function UsersPanel({ showToast, user: currentUser }) {
-  const [modal,  setModal]  = useState(false)
-  const [saving, setSaving] = useState(false)
+const ROLE_LABEL = { admin: 'Admin', manager: 'Gerente', operator: 'Operador', viewer: 'Visualizador' }
+const ROLE_COLORS = { admin: 'var(--red)', manager: 'var(--warn)', operator: 'var(--blue)', viewer: 'var(--muted)' }
+
+function UsersPanel({ showToast, user: currentUser, session }) {
+  const [users,   setUsers]   = useState([])
+  const [loading, setLoading] = useState(true)
+  const [modal,   setModal]   = useState(false)
+  const [saving,  setSaving]  = useState(false)
+  const [deleting,setDeleting]= useState(null)
   const [f, setF] = useState({ name: '', username: '', password: '', password2: '', role: 'operator' })
 
+  const token = session?.access_token
+
+  async function loadUsers() {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/users/list', { headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json()
+      setUsers(data.users || [])
+    } catch { setUsers([]) }
+    setLoading(false)
+  }
+
   async function createUser() {
-    if (!f.name || !f.username || !f.password) return alert('Preencha todos os campos')
-    if (f.password !== f.password2) return alert('As senhas não coincidem')
-    if (f.password.length < 6) return alert('Senha mínimo 6 caracteres')
+    if (!f.name.trim())     return showToast('Nome obrigatório', 'err')
+    if (!f.username.trim()) return showToast('Usuário obrigatório', 'err')
+    if (f.password.length < 6) return showToast('Senha mínimo 6 caracteres', 'err')
+    if (f.password !== f.password2) return showToast('As senhas não coincidem', 'err')
     setSaving(true)
-    // Herda o company_id do admin que está criando o usuário
-    const company_id = currentUser?.company_id
-    const { error } = await supabase.auth.signUp({
-      email: toEmail(f.username),
-      password: f.password,
-      options: { data: { name: f.name, username: f.username, role: f.role, company_id } }
-    })
+    try {
+      const res = await fetch('/api/users/create', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: f.name, username: f.username, password: f.password, role: f.role }),
+      })
+      const data = await res.json()
+      if (data.error) { showToast('Erro: ' + data.error, 'err'); setSaving(false); return }
+      showToast(`Usuário ${f.name} criado com sucesso ✓`)
+      setModal(false)
+      setF({ name: '', username: '', password: '', password2: '', role: 'operator' })
+      loadUsers()
+    } catch (e) { showToast('Erro de conexão', 'err') }
     setSaving(false)
-    if (error) { showToast('Erro: ' + error.message, 'err'); return }
-    showToast('Usuário criado ✓')
-    setModal(false)
+  }
+
+  async function deleteUser(u) {
+    if (!confirm(`Remover o usuário "${u.name}"? Esta ação não pode ser desfeita.`)) return
+    setDeleting(u.id)
+    try {
+      const res = await fetch('/api/users/list', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: u.id }),
+      })
+      const data = await res.json()
+      if (data.error) { showToast('Erro: ' + data.error, 'err') }
+      else { showToast(`Usuário ${u.name} removido`); loadUsers() }
+    } catch { showToast('Erro de conexão', 'err') }
+    setDeleting(null)
+  }
+
+  useEffect(() => { loadUsers() }, [])
+
+  function fmtDate(d) {
+    if (!d) return '–'
+    return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
   }
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.75rem' }}>
-        <div style={{ fontSize: '.82rem', color: 'var(--muted)' }}>
-          Usuário logado: <strong style={{ color: 'var(--text)' }}>{currentUser?.name || currentUser?.username}</strong>
-          <span className={`role-badge ${currentUser?.role}`} style={{ marginLeft: '.5rem' }}>{currentUser?.role}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontSize: '.95rem', fontWeight: 600, color: 'var(--text)' }}>👥 Usuários da empresa</div>
+          <div style={{ fontSize: '.78rem', color: 'var(--muted)', marginTop: '.15rem' }}>
+            Usuários que podem acessar o sistema. Login com <strong>usuário + senha</strong>.
+          </div>
         </div>
         <button className="btn-primary" onClick={() => { setF({ name: '', username: '', password: '', password2: '', role: 'operator' }); setModal(true) }}>
           + Novo Usuário
         </button>
       </div>
 
-      <div className="cfg-card">
-        <div className="cfg-title">👥 Gerenciar Usuários</div>
-        <div style={{ fontSize: '.82rem', color: 'var(--muted)', lineHeight: 1.7 }}>
-          Os usuários fazem login com <strong>nome de usuário + senha</strong>.<br />
-          Para ver todos os usuários cadastrados acesse o painel do Supabase → <strong>Authentication → Users</strong>.<br />
-          Para redefinir senha de um usuário, acesse o mesmo painel e clique em <strong>Send recovery email</strong>.
+      {/* Lista de usuários */}
+      <div className="cfg-card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px 90px 80px', padding: '.6rem 1rem', background: 'var(--s2)', borderBottom: '1px solid var(--border)', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', letterSpacing: '.1em', textTransform: 'uppercase' }}>
+          <span>Nome</span><span>Usuário</span><span>Permissão</span><span>Cadastro</span><span></span>
         </div>
+        {loading ? (
+          <div className="empty">Carregando…</div>
+        ) : users.length === 0 ? (
+          <div className="empty">Nenhum usuário encontrado</div>
+        ) : users.map(u => (
+          <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px 90px 80px', padding: '.75rem 1rem', borderBottom: '1px solid var(--border)', alignItems: 'center' }}>
+            <div style={{ fontWeight: 600, fontSize: '.88rem' }}>
+              {u.name}
+              {u.id === currentUser?.sub && <span style={{ fontSize: '.68rem', color: 'var(--blue)', marginLeft: '.4rem' }}>(você)</span>}
+            </div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.8rem', color: 'var(--muted)' }}>@{u.username}</div>
+            <div>
+              <span className={`role-badge ${u.role}`}>{ROLE_LABEL[u.role] || u.role}</span>
+            </div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)' }}>{fmtDate(u.created_at)}</div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              {u.id !== currentUser?.sub && (
+                <button className="abtn r" style={{ fontSize: '.72rem' }} disabled={deleting === u.id}
+                  onClick={() => deleteUser(u)}>
+                  {deleting === u.id ? '…' : '🗑'}
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
 
+      {/* Modal novo usuário */}
       {modal && (
         <div className="overlay open" onClick={e => e.target.className === 'overlay open' && setModal(false)}>
-          <div className="modal" style={{ width: '460px' }}>
+          <div className="modal" style={{ width: '480px' }}>
             <div className="mhead">
               <span className="mtitle">NOVO USUÁRIO</span>
               <button className="mclose" onClick={() => setModal(false)}>✕</button>
@@ -435,34 +508,48 @@ function UsersPanel({ showToast, user: currentUser }) {
               <div className="fgrid">
                 <div className="fg full">
                   <label className="flabel">NOME COMPLETO *</label>
-                  <input className="finput" value={f.name} onChange={e => setF(p => ({ ...p, name: e.target.value }))} placeholder="Ex: João Silva" />
+                  <input className="finput" value={f.name}
+                    onChange={e => setF(p => ({ ...p, name: e.target.value }))}
+                    placeholder="Ex: João Silva" autoFocus />
                 </div>
                 <div className="fg">
-                  <label className="flabel">USUÁRIO *</label>
-                  <input className="finput" value={f.username} onChange={e => setF(p => ({ ...p, username: e.target.value }))} placeholder="joao.silva" autoComplete="off" />
+                  <label className="flabel">USUÁRIO DE LOGIN *</label>
+                  <input className="finput" value={f.username}
+                    onChange={e => setF(p => ({ ...p, username: e.target.value }))}
+                    placeholder="joao.silva" autoComplete="off" />
                 </div>
                 <div className="fg">
                   <label className="flabel">PERMISSÃO</label>
-                  <select className="finput" value={f.role} onChange={e => setF(p => ({ ...p, role: e.target.value }))}>
-                    <option value="admin">🔴 Admin</option>
-                    <option value="manager">🟠 Gerente</option>
-                    <option value="operator">🔵 Operador</option>
-                    <option value="viewer">⚪ Visualizador</option>
+                  <select className="finput" value={f.role}
+                    onChange={e => setF(p => ({ ...p, role: e.target.value }))}>
+                    <option value="admin">🔴 Admin — acesso total</option>
+                    <option value="manager">🟠 Gerente — gerencia tarefas</option>
+                    <option value="operator">🔵 Operador — cria e edita tarefas</option>
+                    <option value="viewer">⚪ Visualizador — somente leitura</option>
                   </select>
                 </div>
                 <div className="fg">
                   <label className="flabel">SENHA *</label>
-                  <input className="finput" type="password" value={f.password} onChange={e => setF(p => ({ ...p, password: e.target.value }))} placeholder="Mínimo 6 caracteres" />
+                  <input className="finput" type="password" value={f.password}
+                    onChange={e => setF(p => ({ ...p, password: e.target.value }))}
+                    placeholder="Mínimo 6 caracteres" />
                 </div>
                 <div className="fg">
-                  <label className="flabel">CONFIRMAR SENHA</label>
-                  <input className="finput" type="password" value={f.password2} onChange={e => setF(p => ({ ...p, password2: e.target.value }))} />
+                  <label className="flabel">CONFIRMAR SENHA *</label>
+                  <input className="finput" type="password" value={f.password2}
+                    onChange={e => setF(p => ({ ...p, password2: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && createUser()} />
                 </div>
+              </div>
+              <div style={{ marginTop: '1rem', padding: '.75rem', background: 'var(--s2)', borderRadius: 'var(--radius-sm)', fontSize: '.78rem', color: 'var(--muted)' }}>
+                💡 O usuário fará login com <strong style={{ color: 'var(--text)' }}>@{f.username || 'usuario'}</strong> e a senha definida acima.
               </div>
             </div>
             <div className="mfoot">
               <button className="btn-sec" onClick={() => setModal(false)}>Cancelar</button>
-              <button className="btn-primary" onClick={createUser} disabled={saving}>{saving ? 'Criando…' : 'CRIAR USUÁRIO'}</button>
+              <button className="btn-primary" onClick={createUser} disabled={saving}>
+                {saving ? 'Criando…' : '✓ Criar Usuário'}
+              </button>
             </div>
           </div>
         </div>

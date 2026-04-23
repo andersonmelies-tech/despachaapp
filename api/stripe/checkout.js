@@ -49,34 +49,42 @@ export default async function handler(req) {
   // Cria ou reutiliza customer no Stripe
   let customerId = company.stripe_customer_id
   if (!customerId) {
+    // metadata[key] = value é o formato correto para a API form-encoded do Stripe
+    const custBody = new URLSearchParams({
+      'metadata[company_id]': String(company.id),
+    })
+    if (company.name) custBody.set('name', company.name)
+
     const custRes = await fetch('https://api.stripe.com/v1/customers', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${SK}`,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams({ name: company.name, metadata: { company_id: company.id } }),
+      body: custBody,
     })
     const cust = await custRes.json()
-    if (!cust.id) return json({ error: 'Failed to create Stripe customer' }, 500)
+    if (!cust.id) {
+      console.error('Stripe customer error:', JSON.stringify(cust))
+      return json({ error: 'Failed to create Stripe customer: ' + (cust.error?.message || 'unknown') }, 500)
+    }
     customerId = cust.id
     await sbService.from('companies').update({ stripe_customer_id: customerId }).eq('id', company.id)
   }
 
   // Cria Checkout Session
   const params = new URLSearchParams({
-    customer:                       customerId,
-    'line_items[0][price]':         PRICES[plan],
-    'line_items[0][quantity]':      '1',
-    mode:                           'subscription',
-    'subscription_data[trial_period_days]': '0',
-    'metadata[company_id]':         company.id,
-    'metadata[plan]':               plan,
-    success_url:                    `${APP_URL}/?payment=success&plan=${plan}`,
-    cancel_url:                     `${APP_URL}/?payment=cancelled`,
-    locale:                         'pt-BR',
-    'payment_method_types[0]':      'card',
-    allow_promotion_codes:          'true',
+    customer:                            customerId,
+    'line_items[0][price]':              PRICES[plan],
+    'line_items[0][quantity]':           '1',
+    mode:                                'subscription',
+    'metadata[company_id]':              String(company.id),
+    'metadata[plan]':                    plan,
+    'subscription_data[metadata][company_id]': String(company.id),
+    success_url:                         `${APP_URL}/?payment=success&plan=${plan}`,
+    cancel_url:                          `${APP_URL}/?payment=cancelled`,
+    locale:                              'pt-BR',
+    allow_promotion_codes:               'true',
   })
 
   const sessRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
