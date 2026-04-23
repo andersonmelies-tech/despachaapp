@@ -12,6 +12,7 @@ const TABS = [
 // ── Setup (ex-Geral + ex-Telegram unificados) ─────────────────────────────────
 function SetupPanel({ showToast }) {
   const [cfg, setCfg]           = useState({})
+  const [company, setCompany]   = useState(null)
   const [testing, setTesting]   = useState(false)
   const [botInfo, setBotInfo]   = useState(null)
   const [saving, setSaving]     = useState(false)
@@ -20,7 +21,15 @@ function SetupPanel({ showToast }) {
     supabase.from('config').select('*').then(r => {
       const c = {}; (r.data || []).forEach(x => { c[x.key] = x.value }); setCfg(c)
     })
+    supabase.from('companies').select('*').limit(1).single()
+      .then(r => { if (r.data) setCompany(r.data) })
   }, [])
+
+  function copyCode() {
+    if (!company?.invite_code) return
+    navigator.clipboard.writeText(company.invite_code)
+    showToast('Código copiado ✓')
+  }
 
   function set(k, v) { setCfg(c => ({ ...c, [k]: v })) }
 
@@ -127,12 +136,27 @@ function SetupPanel({ showToast }) {
           <div className="setup-step">
             <div className="step-num">4</div>
             <div className="step-body">
-              <div className="step-title">Cadastre seus prestadores</div>
+              <div className="step-title">Convide seus prestadores para o bot</div>
               <div className="step-desc">
-                Vá na aba <strong>Prestadores</strong> e cadastre cada técnico/prestador.
-                Quando eles enviarem <code>/start</code> para o bot pelo nome igual ao cadastrado,
-                o vínculo é feito automaticamente.
+                Cadastre cada prestador na aba <strong>Prestadores</strong> com o nome exato.
+                Depois compartilhe o comando abaixo com eles no WhatsApp ou Telegram:
               </div>
+              {company?.invite_code ? (
+                <div className="invite-code-box">
+                  <div className="invite-code-label">Comando que o prestador envia para o bot:</div>
+                  <div className="invite-code-row">
+                    <code className="invite-code-val">/start {company.invite_code}</code>
+                    <button className="invite-code-copy" onClick={copyCode} title="Copiar">⎘ Copiar</button>
+                  </div>
+                  <div className="invite-code-hint">
+                    O prestador abre o bot no Telegram, envia esse comando e é vinculado automaticamente.
+                  </div>
+                </div>
+              ) : (
+                <div style={{ marginTop: '.5rem', fontSize: '.78rem', color: 'var(--muted)' }}>
+                  ⏳ Carregando código…
+                </div>
+              )}
             </div>
           </div>
         </div>

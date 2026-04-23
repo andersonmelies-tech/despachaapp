@@ -428,6 +428,32 @@ textarea.finput { resize: vertical; min-height: 80px; }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--blue); }
 
+/* ── INVITE CODE ──────────────────────────────────────── */
+.invite-code-box {
+  margin-top: .75rem;
+  background: #3296EE0a;
+  border: 1px solid #3296EE33;
+  border-left: 3px solid var(--blue);
+  border-radius: var(--radius-sm);
+  padding: .75rem 1rem;
+}
+.invite-code-label {
+  font-size: .72rem; color: var(--muted); margin-bottom: .4rem;
+  font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
+}
+.invite-code-row { display: flex; align-items: center; gap: .65rem; }
+.invite-code-val {
+  font-family: var(--mono); font-size: 1.05rem; font-weight: 700;
+  color: var(--blue2); flex: 1;
+}
+.invite-code-copy {
+  background: var(--s3); border: 1px solid var(--border); color: var(--blue);
+  font-size: .78rem; padding: .3rem .65rem; border-radius: var(--radius-sm);
+  cursor: pointer; transition: all .15s;
+}
+.invite-code-copy:hover { background: var(--blue); color: #fff; }
+.invite-code-hint { font-size: .75rem; color: var(--muted); margin-top: .5rem; line-height: 1.5; }
+
 /* ── MOBILE NAV ───────────────────────────────────────── */
 .mobile-nav { display: none; }
 

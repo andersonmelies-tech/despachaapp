@@ -2,7 +2,7 @@ const NAV = [
   { id: 'dashboard', label: 'Início',   icon: '⊞' },
   { id: 'tasks',     label: 'Tarefas',  icon: '✓' },
   { id: 'calendar',  label: 'Agenda',   icon: '⊡' },
-  { id: 'settings',  label: 'Config',   icon: '⚙' },
+  { id: 'settings',  label: 'Configurações', icon: '⚙' },
 ]
 
 export default function MobileNav({ tab, setTab, stats }) {

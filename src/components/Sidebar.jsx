@@ -2,7 +2,7 @@ const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard',  icon: '▦' },
   { id: 'tasks',     label: 'Tarefas',    icon: '≡' },
   { id: 'calendar',  label: 'Agenda',     icon: '▦' },
-  { id: 'settings',  label: 'Config',     icon: '⚙' },
+  { id: 'settings',  label: 'Configurações', icon: '⚙' },
 ]
 
 const FILTERS = [
