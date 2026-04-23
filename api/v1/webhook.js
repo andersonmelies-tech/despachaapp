@@ -1,5 +1,7 @@
 import { authenticate, ok, err, CORS_HEADERS } from './_auth.js'
 
+export const config = { runtime: 'edge' }
+
 const VALID_EVENTS  = ['task.create']
 const VALID_URGENCY = ['critica', 'alta', 'media', 'baixa']
 

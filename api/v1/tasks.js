@@ -1,5 +1,7 @@
 import { authenticate, ok, err, CORS_HEADERS } from './_auth.js'
 
+export const config = { runtime: 'edge' }
+
 export default async function handler(request) {
   // Handle preflight
   if (request.method === 'OPTIONS') {

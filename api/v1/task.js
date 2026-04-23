@@ -1,5 +1,7 @@
 import { authenticate, ok, err, CORS_HEADERS } from './_auth.js'
 
+export const config = { runtime: 'edge' }
+
 const ALLOWED_PATCH_FIELDS = ['status', 'assignee_id', 'due_date', 'notes']
 const VALID_STATUSES = ['pendente', 'em_andamento', 'concluida', 'cancelada']
 

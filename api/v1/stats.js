@@ -1,5 +1,7 @@
 import { authenticate, ok, err, CORS_HEADERS } from './_auth.js'
 
+export const config = { runtime: 'edge' }
+
 function isOverdue(task) {
   if (['concluida', 'cancelada'].includes(task.status)) return false
   const now = new Date()
