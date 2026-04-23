@@ -1,9 +1,9 @@
 const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard',  icon: '▦' },
-  { id: 'tasks',     label: 'Tarefas',    icon: '≡' },
-  { id: 'calendar',  label: 'Agenda',     icon: '▦' },
-  { id: 'reports',   label: 'Relatórios', icon: '📊' },
-  { id: 'settings',  label: 'Configurações', icon: '⚙' },
+  { id: 'dashboard', label: 'Dashboard',     icon: '▦'  },
+  { id: 'tasks',     label: 'Tarefas',       icon: '≡'  },
+  { id: 'calendar',  label: 'Agenda',        icon: '📅' },
+  { id: 'reports',   label: 'Relatórios',    icon: '📊' },
+  { id: 'settings',  label: 'Configurações', icon: '⚙'  },
 ]
 
 const FILTERS = [
@@ -15,7 +15,7 @@ const FILTERS = [
   { id: 'criticas',     label: 'Críticas',     icon: '⚠',  statKey: 'criticas',     cls: 'bd-red' },
 ]
 
-export default function Sidebar({ tab, setTab, sideFilter, setSideFilter, stats }) {
+export default function Sidebar({ tab, setTab, sideFilter, setSideFilter, stats, isSuperAdmin }) {
   const s = stats || {}
   const isTasksTab = tab === 'tasks'
 
@@ -33,13 +33,27 @@ export default function Sidebar({ tab, setTab, sideFilter, setSideFilter, stats 
           >
             <span className="sb-icon">{item.icon}</span>
             <span className="sb-label-text">{item.label}</span>
-            {/* Badge de atrasadas no item Tarefas */}
             {item.id === 'tasks' && s.atrasadas > 0 && (
               <span className="badge bd-red">{s.atrasadas}</span>
             )}
           </div>
         ))}
       </div>
+
+      {/* ── Admin (superadmin only) ── */}
+      {isSuperAdmin && (
+        <div className="sb-section">
+          <div className="sb-section-label">Sistema</div>
+          <div
+            className={`sb-item sb-admin${tab === 'admin' ? ' active' : ''}`}
+            onClick={() => setTab('admin')}
+          >
+            <span className="sb-icon">🛡️</span>
+            <span className="sb-label-text">Admin</span>
+            <span className="badge" style={{ background: '#9b59f522', color: 'var(--purple)', border: '1px solid #9b59f544' }}>SYS</span>
+          </div>
+        </div>
+      )}
 
       {/* ── Filtros (só na aba Tarefas) ── */}
       {isTasksTab && (

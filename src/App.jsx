@@ -1,17 +1,20 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from './lib/supabase.js'
-import Login      from './components/Login.jsx'
-import Topbar     from './components/Topbar.jsx'
-import Sidebar    from './components/Sidebar.jsx'
-import Dashboard  from './components/Dashboard.jsx'
-import Tasks      from './components/Tasks.jsx'
-import Calendar   from './components/Calendar.jsx'
-import Reports    from './components/Reports.jsx'
-import Settings   from './components/Settings.jsx'
-import Toast      from './components/Toast.jsx'
-import MobileNav  from './components/MobileNav.jsx'
-import Pricing    from './components/Pricing.jsx'
+import Login       from './components/Login.jsx'
+import Topbar      from './components/Topbar.jsx'
+import Sidebar     from './components/Sidebar.jsx'
+import Dashboard   from './components/Dashboard.jsx'
+import Tasks       from './components/Tasks.jsx'
+import Calendar    from './components/Calendar.jsx'
+import Reports     from './components/Reports.jsx'
+import Settings    from './components/Settings.jsx'
+import AdminPanel  from './components/AdminPanel.jsx'
+import Toast       from './components/Toast.jsx'
+import MobileNav   from './components/MobileNav.jsx'
+import Pricing     from './components/Pricing.jsx'
 import TrialBanner from './components/TrialBanner.jsx'
+
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'andersonmelies@gmail.com'
 
 function trialDaysLeft(trialEndsAt) {
   if (!trialEndsAt) return 14
@@ -79,7 +82,8 @@ export default function App() {
 
   if (!session) return <Login onLogin={s => setSession(s)} showToast={showToast} />
 
-  const meta    = session.user?.user_metadata || {}
+  const meta      = session.user?.user_metadata || {}
+  const isSuperAdmin = session.user?.email === ADMIN_EMAIL || meta?.is_superadmin === true
   const plan    = company?.subscription_status
   const daysLeft = trialDaysLeft(company?.trial_ends_at)
   const isActive = plan === 'active' || plan === 'trialing' || daysLeft > 0
@@ -129,7 +133,7 @@ export default function App() {
         <Sidebar
           tab={tab}         setTab={handleSetTab}
           sideFilter={sideFilter} setSideFilter={handleSideFilter}
-          stats={stats}
+          stats={stats}    isSuperAdmin={isSuperAdmin}
         />
         <div className="main">
           {tab === 'dashboard' && <Dashboard showToast={showToast} onStatsLoaded={setStats} />}
@@ -137,6 +141,7 @@ export default function App() {
           {tab === 'calendar'  && <Calendar showToast={showToast} />}
           {tab === 'reports'   && <Reports  showToast={showToast} />}
           {tab === 'settings'  && <Settings showToast={showToast} user={meta} session={session} />}
+          {tab === 'admin'     && isSuperAdmin && <AdminPanel session={session} />}
         </div>
       </div>
 
