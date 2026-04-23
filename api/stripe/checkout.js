@@ -6,7 +6,7 @@ const SK          = process.env.STRIPE_SECRET_KEY
 const SB_URL      = process.env.SUPABASE_URL
 const SB_ANON     = process.env.SUPABASE_ANON_KEY
 const SB_SERVICE  = process.env.SUPABASE_SERVICE_KEY
-const APP_URL     = process.env.APP_URL || 'https://despachaapp.vercel.app'
+const APP_URL     = process.env.APP_URL || 'https://www.despachaapp.com.br'
 
 const PRICES_MONTHLY = {
   starter:    'price_1TPRCsGsVnzNJmCnvEK08gWJ',
