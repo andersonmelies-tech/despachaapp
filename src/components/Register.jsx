@@ -24,6 +24,7 @@ export default function Register({ onBack, onRegistered, showToast }) {
     setLoading(true); setErr('')
     try {
       // 1. Criar empresa via RPC segura (bypassa RLS para retornar o id)
+      // trial_ends_at é definido automaticamente pela migration_stripe.sql (NOW() + 14 days)
       const { data: company_id, error: compErr } = await supabase
         .rpc('create_company', { company_name: company.name.trim() })
       if (compErr) throw new Error('Erro ao criar empresa: ' + compErr.message)

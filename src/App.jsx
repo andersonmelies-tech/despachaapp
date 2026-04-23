@@ -1,15 +1,23 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from './lib/supabase.js'
-import Login    from './components/Login.jsx'
-import Topbar   from './components/Topbar.jsx'
-import Sidebar  from './components/Sidebar.jsx'
-import Dashboard from './components/Dashboard.jsx'
-import Tasks    from './components/Tasks.jsx'
-import Calendar from './components/Calendar.jsx'
-import Reports  from './components/Reports.jsx'
-import Settings from './components/Settings.jsx'
-import Toast    from './components/Toast.jsx'
-import MobileNav from './components/MobileNav.jsx'
+import Login      from './components/Login.jsx'
+import Topbar     from './components/Topbar.jsx'
+import Sidebar    from './components/Sidebar.jsx'
+import Dashboard  from './components/Dashboard.jsx'
+import Tasks      from './components/Tasks.jsx'
+import Calendar   from './components/Calendar.jsx'
+import Reports    from './components/Reports.jsx'
+import Settings   from './components/Settings.jsx'
+import Toast      from './components/Toast.jsx'
+import MobileNav  from './components/MobileNav.jsx'
+import Pricing    from './components/Pricing.jsx'
+import TrialBanner from './components/TrialBanner.jsx'
+
+function trialDaysLeft(trialEndsAt) {
+  if (!trialEndsAt) return 14
+  const diff = new Date(trialEndsAt) - new Date()
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+}
 
 export default function App() {
   const [session,     setSession]     = useState(null)
@@ -19,6 +27,8 @@ export default function App() {
   const [toast,       setToast]       = useState({ msg: '', type: '', visible: false })
   const [stats,       setStats]       = useState(null)
   const [tasksKey,    setTasksKey]    = useState(0)
+  const [company,     setCompany]     = useState(null)
+  const [showPricing, setShowPricing] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -28,20 +38,37 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Carrega dados da empresa (plano + trial)
+  useEffect(() => {
+    if (!session) return
+    supabase.from('companies').select('*').single()
+      .then(({ data }) => { if (data) setCompany(data) })
+  }, [session])
+
+  // Verifica retorno do Stripe
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('payment') === 'success') {
+      showToast('🎉 Assinatura ativada com sucesso!')
+      window.history.replaceState({}, '', '/')
+      // Recarrega empresa para pegar novo status
+      supabase.from('companies').select('*').single().then(({ data }) => { if (data) setCompany(data) })
+    }
+    if (params.get('payment') === 'cancelled') {
+      showToast('Pagamento cancelado', 'err')
+      window.history.replaceState({}, '', '/')
+    }
+  }, [])
+
   const showToast = useCallback((msg, type = 'ok') => {
     setToast({ msg, type, visible: true })
     setTimeout(() => setToast(t => ({ ...t, visible: false })), 3200)
   }, [])
 
   const handleSetTab = (t) => {
-    setTab(t)
-    if (t !== 'tasks') setSideFilter('all')
+    setTab(t); if (t !== 'tasks') setSideFilter('all')
   }
-
-  const handleSideFilter = (f) => {
-    setSideFilter(f)
-    setTab('tasks')
-  }
+  const handleSideFilter = (f) => { setSideFilter(f); setTab('tasks') }
 
   if (loading) return (
     <div className="loading-screen">
@@ -52,11 +79,51 @@ export default function App() {
 
   if (!session) return <Login onLogin={s => setSession(s)} showToast={showToast} />
 
-  const meta = session.user?.user_metadata || {}
+  const meta    = session.user?.user_metadata || {}
+  const plan    = company?.subscription_status
+  const daysLeft = trialDaysLeft(company?.trial_ends_at)
+  const isActive = plan === 'active' || plan === 'trialing' || daysLeft > 0
+
+  // Gate: trial expirado e sem assinatura
+  if (company && !isActive && !showPricing) {
+    return (
+      <>
+        <Pricing
+          session={session}
+          trialDaysLeft={0}
+          onSuccess={() => {
+            supabase.from('companies').select('*').single().then(({ data }) => { if (data) setCompany(data) })
+          }}
+        />
+        <Toast msg={toast.msg} type={toast.type} visible={toast.visible} />
+      </>
+    )
+  }
 
   return (
     <>
       <Topbar user={meta} onLogout={() => supabase.auth.signOut()} />
+
+      {/* Banner de trial */}
+      {company?.plan === 'trial' && (
+        <TrialBanner
+          daysLeft={daysLeft}
+          plan={company?.plan}
+          onUpgrade={() => setShowPricing(true)}
+        />
+      )}
+
+      {/* Modal de upgrade */}
+      {showPricing && (
+        <div className="modal-overlay-full" onClick={() => setShowPricing(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 1100, margin: '0 auto' }}>
+            <div style={{ textAlign: 'right', padding: '1rem 1rem 0' }}>
+              <button className="mclose" onClick={() => setShowPricing(false)} style={{ fontSize: '1.2rem' }}>✕</button>
+            </div>
+            <Pricing session={session} trialDaysLeft={daysLeft} onSuccess={() => setShowPricing(false)} />
+          </div>
+        </div>
+      )}
 
       <div className="layout">
         <Sidebar
@@ -64,7 +131,6 @@ export default function App() {
           sideFilter={sideFilter} setSideFilter={handleSideFilter}
           stats={stats}
         />
-
         <div className="main">
           {tab === 'dashboard' && <Dashboard showToast={showToast} onStatsLoaded={setStats} />}
           {tab === 'tasks'     && <Tasks key={tasksKey} showToast={showToast} sideFilter={sideFilter} user={meta} onStatsChange={() => setTasksKey(k => k + 1)} />}
