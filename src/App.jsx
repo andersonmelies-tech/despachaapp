@@ -6,6 +6,7 @@ import Sidebar  from './components/Sidebar.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import Tasks    from './components/Tasks.jsx'
 import Calendar from './components/Calendar.jsx'
+import Reports  from './components/Reports.jsx'
 import Settings from './components/Settings.jsx'
 import Toast    from './components/Toast.jsx'
 import MobileNav from './components/MobileNav.jsx'
@@ -68,6 +69,7 @@ export default function App() {
           {tab === 'dashboard' && <Dashboard showToast={showToast} onStatsLoaded={setStats} />}
           {tab === 'tasks'     && <Tasks key={tasksKey} showToast={showToast} sideFilter={sideFilter} user={meta} onStatsChange={() => setTasksKey(k => k + 1)} />}
           {tab === 'calendar'  && <Calendar showToast={showToast} />}
+          {tab === 'reports'   && <Reports  showToast={showToast} />}
           {tab === 'settings'  && <Settings showToast={showToast} user={meta} session={session} />}
         </div>
       </div>

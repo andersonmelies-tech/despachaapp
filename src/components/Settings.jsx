@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase, toEmail } from '../lib/supabase.js'
+import ApiDocs from './ApiDocs.jsx'
 
 // Username do bot centralizado (configure VITE_BOT_USERNAME no Vercel)
 const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME || 'despachaapp_bot'
@@ -22,6 +23,7 @@ const TABS = [
   { id: 'sla',       label: '⏱ SLA' },
   { id: 'sectors',   label: '🏢 Setores' },
   { id: 'users',     label: '👥 Usuários' },
+  { id: 'api',       label: '🔌 API / ERP' },
 ]
 
 // ── Setup — modelo de bot centralizado ───────────────────────────────────────
@@ -487,6 +489,7 @@ export default function Settings({ showToast, user, session }) {
       {tab === 'sla'       && <SLAPanel        showToast={showToast} />}
       {tab === 'sectors'   && <SectorsPanel    showToast={showToast} />}
       {tab === 'users'     && <UsersPanel      showToast={showToast} user={user} />}
+      {tab === 'api'       && <ApiDocs         showToast={showToast} />}
     </div>
   )
 }

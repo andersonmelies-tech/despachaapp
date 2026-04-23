@@ -1,8 +1,9 @@
 const NAV = [
-  { id: 'dashboard', label: 'Início',   icon: '⊞' },
-  { id: 'tasks',     label: 'Tarefas',  icon: '✓' },
-  { id: 'calendar',  label: 'Agenda',   icon: '⊡' },
-  { id: 'settings',  label: 'Configurações', icon: '⚙' },
+  { id: 'dashboard', label: 'Início',      icon: '⊞' },
+  { id: 'tasks',     label: 'Tarefas',     icon: '✓' },
+  { id: 'calendar',  label: 'Agenda',      icon: '⊡' },
+  { id: 'reports',   label: 'Relatórios',  icon: '📊' },
+  { id: 'settings',  label: 'Config.',     icon: '⚙' },
 ]
 
 export default function MobileNav({ tab, setTab, stats }) {
