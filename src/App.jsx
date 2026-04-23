@@ -14,7 +14,7 @@ import MobileNav   from './components/MobileNav.jsx'
 import Pricing     from './components/Pricing.jsx'
 import TrialBanner from './components/TrialBanner.jsx'
 
-const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'andersonmelies@gmail.com'
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'admin@despachaapp.app'
 
 function trialDaysLeft(trialEndsAt) {
   if (!trialEndsAt) return 14

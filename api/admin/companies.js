@@ -4,7 +4,7 @@ export const config = { runtime: 'edge' }
 
 const SB_URL     = process.env.SUPABASE_URL
 const SB_SERVICE = process.env.SUPABASE_SERVICE_KEY
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'andersonmelies@gmail.com'
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@despachaapp.app'
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
