@@ -12,9 +12,34 @@ function fmtDate(d) {
   return new Date(d + 'T12:00:00').toLocaleDateString('pt-BR')
 }
 
+function greeting() {
+  const h = new Date().getHours()
+  if (h < 12) return 'Bom dia'
+  if (h < 18) return 'Boa tarde'
+  return 'Boa noite'
+}
+
+function todayFmt() {
+  return new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
+}
+
+function pct(part, total) {
+  if (!total) return 0
+  return Math.round((part / total) * 100)
+}
+
+const CARD_CFG = [
+  { key: 'total',        label: 'Total',        icon: '📋', cls: 'c-total', color: 'var(--gray)'   },
+  { key: 'pendente',     label: 'Pendentes',    icon: '⏳', cls: 'c-pend',  color: 'var(--warn)'   },
+  { key: 'em_andamento', label: 'Em andamento', icon: '⚡', cls: 'c-work',  color: 'var(--blue)'   },
+  { key: 'concluida',    label: 'Concluídas',   icon: '✅', cls: 'c-done',  color: 'var(--green)'  },
+  { key: 'atrasadas',    label: 'Atrasadas',    icon: '🔴', cls: 'c-late',  color: 'var(--red)'    },
+  { key: 'avg_minutes',  label: 'Tempo médio',  icon: '⏱️', cls: 'c-avg',   color: 'var(--yellow)' },
+]
+
 export default function Dashboard({ showToast, onStatsLoaded }) {
-  const [stats, setStats] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [stats,        setStats]        = useState(null)
+  const [loading,      setLoading]      = useState(true)
   const [pendingDates, setPendingDates] = useState([])
 
   async function loadPendingDates() {
@@ -53,102 +78,187 @@ export default function Dashboard({ showToast, onStatsLoaded }) {
   useEffect(() => { load() }, [])
 
   const s = stats || {}
-
-  const cards = [
-    { cls: 'c-total', val: s.total ?? '–',        label: 'Total' },
-    { cls: 'c-pend',  val: s.pendente ?? '–',     label: 'Pendentes' },
-    { cls: 'c-work',  val: s.em_andamento ?? '–', label: 'Em andamento' },
-    { cls: 'c-done',  val: s.concluida ?? '–',    label: 'Concluídas' },
-    { cls: 'c-late',  val: s.atrasadas ?? '–',    label: 'Atrasadas' },
-    { cls: 'c-avg',   val: s.avg_minutes ? fmtMin(s.avg_minutes) : '–', label: 'Tempo médio' },
-  ]
+  const total = s.total || 0
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.85rem', color: 'var(--accent)' }}>
-          📊 Dashboard
+    <div className="dash-wrap">
+
+      {/* ── Header ── */}
+      <div className="dash-header">
+        <div className="dash-greeting">
+          <span className="dash-greeting-hi">{greeting()} 👋</span>
+          <span className="dash-greeting-date">{todayFmt()}</span>
         </div>
-        <button className="btn-sec" onClick={load}>↻ Atualizar</button>
+        <button className="dash-refresh" onClick={load} title="Atualizar">
+          <span className={loading ? 'spin' : ''}>↻</span> Atualizar
+        </button>
       </div>
 
-      {/* Alertas: novas datas aguardando aprovação */}
+      {/* ── Alerta: datas aguardando aprovação ── */}
       {pendingDates.length > 0 && (
-        <div className="pending-dates-panel">
-          <div className="pending-dates-title">
-            <span className="pending-dates-dot" />
-            📅 {pendingDates.length} data{pendingDates.length > 1 ? 's' : ''} aguardando aprovação
-          </div>
-          {pendingDates.map(task => (
-            <div key={task.id} className="pending-date-row">
-              <div className="pending-date-info">
-                <span className="pending-date-id">#{task.id}</span>
-                <span className="pending-date-title">{task.title}</span>
-                <span className="pending-date-provider">👤 {task.assignee}</span>
-              </div>
-              <div className="pending-date-dates">
-                <span className="pending-date-old">{fmtDate(task.due_date)} →</span>
-                <span className="pending-date-new">{fmtDate(task.provider_new_date)}</span>
-              </div>
-              <div className="pending-date-actions">
-                <button className="btn-approve" onClick={() => approveDate(task)}>✓ Aprovar</button>
-                <button className="btn-reject"  onClick={() => rejectDate(task)}>✕ Recusar</button>
-              </div>
+        <div className="dash-alert">
+          <div className="dash-alert-icon">📅</div>
+          <div className="dash-alert-body">
+            <div className="dash-alert-title">
+              {pendingDates.length} data{pendingDates.length > 1 ? 's' : ''} aguardando sua aprovação
             </div>
-          ))}
+            <div className="dash-alert-rows">
+              {pendingDates.map(task => (
+                <div key={task.id} className="dash-alert-row">
+                  <span className="dash-alert-id">#{task.id}</span>
+                  <span className="dash-alert-taskname">{task.title}</span>
+                  <span className="dash-alert-provider">👤 {task.assignee}</span>
+                  <span className="dash-alert-dates">
+                    <span className="dash-date-old">{fmtDate(task.due_date)}</span>
+                    <span className="dash-date-arrow">→</span>
+                    <span className="dash-date-new">{fmtDate(task.provider_new_date)}</span>
+                  </span>
+                  <div className="dash-alert-btns">
+                    <button className="dash-btn-approve" onClick={() => approveDate(task)}>✓ Aprovar</button>
+                    <button className="dash-btn-reject"  onClick={() => rejectDate(task)}>✕ Recusar</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Stat cards */}
-      <div className="stat-row">
-        {cards.map(c => (
-          <div key={c.cls} className={`scard ${c.cls}`}>
-            <div className="scard-val">{loading ? '…' : c.val}</div>
-            <div className="scard-label">{c.label}</div>
-          </div>
-        ))}
+      {/* ── KPI Cards ── */}
+      <div className="dash-kpi-grid">
+        {CARD_CFG.map(c => {
+          const raw = s[c.key]
+          const val = c.key === 'avg_minutes' ? fmtMin(raw) : (raw ?? '–')
+          const p   = c.key !== 'avg_minutes' && total ? pct(raw, total) : null
+          return (
+            <div key={c.key} className={`dash-kpi ${c.cls}`} style={{ '--card-color': c.color }}>
+              <div className="dash-kpi-top">
+                <span className="dash-kpi-icon">{c.icon}</span>
+                {p !== null && <span className="dash-kpi-pct">{loading ? '…' : `${p}%`}</span>}
+              </div>
+              <div className="dash-kpi-val">{loading ? '…' : val}</div>
+              <div className="dash-kpi-label">{c.label}</div>
+              {p !== null && !loading && (
+                <div className="dash-kpi-bar">
+                  <div className="dash-kpi-bar-fill" style={{ width: `${p}%`, background: c.color }} />
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
 
-      {/* Provider + Sector stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        {/* Por prestador */}
-        <div className="cfg-card">
-          <div className="cfg-title">👤 Por Prestador</div>
-          {loading ? (
-            <div className="empty">Carregando…</div>
-          ) : (s.por_prestador || []).length === 0 ? (
-            <div className="empty">Sem dados</div>
-          ) : (s.por_prestador || []).map((p, i) => (
-            <div key={i} style={{ padding: '.5rem 0', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '.75rem' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '.83rem', fontWeight: 500 }}>👤 {p.assignee}</div>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.7rem', color: 'var(--muted)' }}>
-                  {p.total} total · {p.concluidas} ✅ · {p.andamento} 🔧 · {p.atrasadas} ⏰ · ⏱{fmtMin(p.avg_min)}
-                </div>
+      {/* ── Distribuição visual ── */}
+      {!loading && total > 0 && (
+        <div className="dash-dist-card">
+          <div className="dash-section-title">📊 Distribuição de tarefas</div>
+          <div className="dash-dist-bar">
+            {[
+              { key: 'concluida',    color: 'var(--green)', label: 'Concluídas' },
+              { key: 'em_andamento', color: 'var(--blue)',  label: 'Em andamento' },
+              { key: 'pendente',     color: 'var(--warn)',  label: 'Pendentes' },
+              { key: 'atrasadas',    color: 'var(--red)',   label: 'Atrasadas' },
+            ].map(item => {
+              const p = pct(s[item.key], total)
+              return p > 0 ? (
+                <div
+                  key={item.key}
+                  className="dash-dist-segment"
+                  style={{ width: `${p}%`, background: item.color }}
+                  title={`${item.label}: ${s[item.key]} (${p}%)`}
+                />
+              ) : null
+            })}
+          </div>
+          <div className="dash-dist-legend">
+            {[
+              { key: 'concluida',    color: 'var(--green)', label: 'Concluídas' },
+              { key: 'em_andamento', color: 'var(--blue)',  label: 'Em andamento' },
+              { key: 'pendente',     color: 'var(--warn)',  label: 'Pendentes' },
+              { key: 'atrasadas',    color: 'var(--red)',   label: 'Atrasadas' },
+            ].map(item => (
+              <div key={item.key} className="dash-dist-legend-item">
+                <span className="dash-dist-dot" style={{ background: item.color }} />
+                <span>{item.label}</span>
+                <strong>{s[item.key] || 0}</strong>
               </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Grid inferior: prestadores + setores ── */}
+      <div className="dash-bottom-grid">
+
+        {/* Por Prestador */}
+        <div className="dash-panel">
+          <div className="dash-section-title">👤 Desempenho por Prestador</div>
+          {loading ? (
+            <div className="dash-loading-rows">
+              {[1,2,3].map(i => <div key={i} className="dash-skeleton" />)}
             </div>
-          ))}
+          ) : (s.por_prestador || []).length === 0 ? (
+            <div className="empty">Nenhum prestador com tarefas</div>
+          ) : (s.por_prestador || []).map((p, i) => {
+            const done = pct(p.concluidas, p.total)
+            const late = pct(p.atrasadas, p.total)
+            return (
+              <div key={i} className="dash-provider-row">
+                <div className="dash-provider-avatar">
+                  {(p.assignee || '?')[0].toUpperCase()}
+                </div>
+                <div className="dash-provider-info">
+                  <div className="dash-provider-name">{p.assignee}</div>
+                  <div className="dash-provider-stats">
+                    <span className="dash-pstat green">✅ {p.concluidas}</span>
+                    <span className="dash-pstat blue">⚡ {p.andamento}</span>
+                    <span className="dash-pstat red">⏰ {p.atrasadas}</span>
+                    <span className="dash-pstat muted">⏱ {fmtMin(p.avg_min)}</span>
+                  </div>
+                  <div className="dash-provider-bar">
+                    <div className="dash-provider-bar-done"  style={{ width: `${done}%` }} />
+                    <div className="dash-provider-bar-late"  style={{ width: `${late}%` }} />
+                  </div>
+                </div>
+                <div className="dash-provider-total">{p.total}</div>
+              </div>
+            )
+          })}
         </div>
 
-        {/* Por setor */}
-        <div className="cfg-card">
-          <div className="cfg-title">🏢 Por Setor</div>
+        {/* Por Setor */}
+        <div className="dash-panel">
+          <div className="dash-section-title">🏢 Tarefas por Setor</div>
           {loading ? (
-            <div className="empty">Carregando…</div>
-          ) : (s.por_setor || []).length === 0 ? (
-            <div className="empty">Sem dados</div>
-          ) : (s.por_setor || []).map((sec, i) => (
-            <div key={i} style={{ padding: '.5rem 0', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '.83rem' }}>🏢 {sec.sector}</span>
-                <span className="badge">{sec.total}</span>
-              </div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.7rem', color: 'var(--muted)', marginTop: '.2rem' }}>
-                {sec.concluidas} concluídas · {sec.abertas} abertas
-              </div>
+            <div className="dash-loading-rows">
+              {[1,2,3].map(i => <div key={i} className="dash-skeleton" />)}
             </div>
-          ))}
+          ) : (s.por_setor || []).length === 0 ? (
+            <div className="empty">Nenhum setor com tarefas</div>
+          ) : (s.por_setor || []).map((sec, i) => {
+            const maxVal = Math.max(...(s.por_setor || []).map(x => x.total))
+            const barW = pct(sec.total, maxVal)
+            const donePct = pct(sec.concluidas, sec.total)
+            return (
+              <div key={i} className="dash-sector-row">
+                <div className="dash-sector-header">
+                  <span className="dash-sector-name">{sec.sector}</span>
+                  <div className="dash-sector-badges">
+                    <span className="dash-sbadge green">{sec.concluidas} ✓</span>
+                    <span className="dash-sbadge warn">{sec.abertas} abertas</span>
+                    <span className="dash-sbadge total">{sec.total}</span>
+                  </div>
+                </div>
+                <div className="dash-sector-bar-wrap">
+                  <div className="dash-sector-bar-fill" style={{ width: `${barW}%` }}>
+                    <div className="dash-sector-bar-done" style={{ width: `${donePct}%` }} />
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
+
       </div>
     </div>
   )
