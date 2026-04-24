@@ -45,9 +45,10 @@ export default function Sidebar({ tab, setTab, sideFilter, setSideFilter, stats,
         <div className="sb-section">
           <div className="sb-section-label">Enterprise</div>
           {[
-            { id: 'clients',  icon: '👥', label: 'Clientes' },
-            { id: 'budgets',  icon: '💰', label: 'Orçamentos' },
-            { id: 'cashflow', icon: '💳', label: 'Caixa' },
+            { id: 'clients',      icon: '👥', label: 'Clientes' },
+            { id: 'budgets',      icon: '💰', label: 'Orçamentos' },
+            { id: 'serviceorders',icon: '📋', label: 'Ordens de Serviço' },
+            { id: 'cashflow',     icon: '💳', label: 'Caixa' },
           ].map(item => (
             <div key={item.id} className={`sb-item${tab === item.id ? ' active' : ''}`} onClick={() => setTab(item.id)}>
               <span className="sb-icon">{item.icon}</span>

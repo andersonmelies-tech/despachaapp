@@ -12,12 +12,13 @@ function fmt(v) { return v ? new Date(v).toLocaleDateString('pt-BR') : '—' }
 function fmtMoney(v) { return v != null ? Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—' }
 
 export default function Budgets({ showToast }) {
-  const [budgets,  setBudgets]  = useState([])
-  const [clients,  setClients]  = useState([])
-  const [modal,    setModal]    = useState(false)
-  const [editing,  setEditing]  = useState(null)
-  const [saving,   setSaving]   = useState(false)
-  const [converting, setConverting] = useState(null)
+  const [budgets,     setBudgets]     = useState([])
+  const [clients,     setClients]     = useState([])
+  const [modal,       setModal]       = useState(false)
+  const [editing,     setEditing]     = useState(null)
+  const [saving,      setSaving]      = useState(false)
+  const [converting,  setConverting]  = useState(null)
+  const [convertingOS, setConvertingOS] = useState(null)
   const [f, setF] = useState({ title: '', description: '', client_id: '', amount: '', status: 'pendente', due_date: '' })
 
   async function load() {
@@ -59,6 +60,22 @@ export default function Budgets({ showToast }) {
     setConverting(null); load()
   }
 
+  async function convertToOS(b) {
+    setConvertingOS(b.id)
+    const { data, error } = await supabase.from('service_orders').insert({
+      title:       b.title,
+      description: b.description || '',
+      client_id:   b.client_id || null,
+      total_value: Number(b.amount) || 0,
+      status:      'aberta',
+      budget_id:   b.id,
+    }).select().single()
+    if (error) { showToast('Erro ao criar OS: ' + error.message, 'err'); setConvertingOS(null); return }
+    await supabase.from('budgets').update({ status: 'convertido', service_order_id: data.id }).eq('id', b.id)
+    showToast(`Orçamento convertido em OS ${data.os_number} ✓ 🎉`)
+    setConvertingOS(null); load()
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '.75rem' }}>
@@ -86,10 +103,16 @@ export default function Budgets({ showToast }) {
                       <div style={{ display: 'flex', gap: '.35rem' }}>
                         <button className="abtn" onClick={() => openEdit(b)}>✏</button>
                         {b.status === 'aprovado' && (
-                          <button className="abtn" style={{ color: 'var(--green)', fontSize: '.7rem', padding: '.2rem .5rem' }}
-                            onClick={() => convertToTask(b)} disabled={converting === b.id}>
-                            {converting === b.id ? '⏳' : '→ Tarefa'}
-                          </button>
+                          <>
+                            <button className="abtn" style={{ color: 'var(--green)', fontSize: '.7rem', padding: '.2rem .5rem' }}
+                              onClick={() => convertToTask(b)} disabled={converting === b.id}>
+                              {converting === b.id ? '⏳' : '→ Tarefa'}
+                            </button>
+                            <button className="abtn" style={{ color: 'var(--blue)', fontSize: '.7rem', padding: '.2rem .5rem' }}
+                              onClick={() => convertToOS(b)} disabled={convertingOS === b.id}>
+                              {convertingOS === b.id ? '⏳' : '→ OS'}
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>

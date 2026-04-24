@@ -25,6 +25,7 @@ const TABS = [
   { id: 'users',     label: '👥 Usuários' },
   { id: 'api',       label: '🔌 API / ERP' },
   { id: 'branding',  label: '🎨 White-label' },
+  { id: 'fiscal',    label: '🧾 Fiscal / NFS-e' },
 ]
 
 // ── Setup — modelo de bot centralizado ───────────────────────────────────────
@@ -663,6 +664,94 @@ function BrandingPanel({ showToast }) {
   )
 }
 
+// ── Fiscal / NFS-e ─────────────────────────────────────────────────────────
+function FiscalPanel({ showToast }) {
+  const FIELDS = [
+    { key: 'nfse_token',               label: 'Token Focus NFe *',              placeholder: 'Gerado no painel Focus NFe', type: 'password' },
+    { key: 'nfse_ambiente',            label: 'Ambiente',                       placeholder: '', type: 'select', options: ['homologacao', 'producao'] },
+    { key: 'nfse_cnpj',               label: 'CNPJ da empresa (somente números)', placeholder: '00000000000000' },
+    { key: 'nfse_razao_social',        label: 'Razão Social',                   placeholder: 'Ex: Empresa XYZ Ltda' },
+    { key: 'nfse_inscricao_municipal', label: 'Inscrição Municipal',            placeholder: 'Número fornecido pela prefeitura' },
+    { key: 'nfse_codigo_municipio',    label: 'Código IBGE do Município',       placeholder: 'Ex: 3550308 (São Paulo)' },
+    { key: 'nfse_codigo_servico',      label: 'Código do Serviço (LC 116)',     placeholder: 'Ex: 17.05' },
+    { key: 'nfse_aliquota',            label: 'Alíquota ISS (decimal)',         placeholder: 'Ex: 0.05 para 5%' },
+    { key: 'nfse_discriminacao',       label: 'Discriminação padrão',           placeholder: 'Texto padrão que aparece na NFS-e' },
+  ]
+
+  const [vals, setVals] = useState({})
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    supabase.from('config').select('key, value')
+      .in('key', FIELDS.map(f => f.key))
+      .then(r => {
+        const c = {}; (r.data || []).forEach(x => { c[x.key] = x.value })
+        setVals(c)
+      })
+  }, [])
+
+  async function save() {
+    setSaving(true)
+    const upserts = FIELDS
+      .filter(f => vals[f.key] !== undefined && vals[f.key] !== '')
+      .map(f => ({ key: f.key, value: vals[f.key] }))
+    for (const u of upserts) {
+      await supabase.from('config').upsert(u)
+    }
+    showToast('Configurações fiscais salvas ✓')
+    setSaving(false)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div className="cfg-card">
+        <div className="cfg-title">🧾 Configuração NFS-e — Focus NFe</div>
+        <div style={{ fontSize: '.8rem', color: 'var(--muted)', marginBottom: '1.25rem', lineHeight: 1.6 }}>
+          Integração com a API <a href="https://focusnfe.com.br" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)' }}>Focus NFe</a> para emissão automática de Nota Fiscal de Serviço Eletrônica.
+          O token é gerado no painel do Focus NFe após criar sua conta.
+        </div>
+
+        <div className="fgrid">
+          {FIELDS.map(f => (
+            <div key={f.key} className={f.key === 'nfse_discriminacao' ? 'fg full' : 'fg'}>
+              <label className="flabel">{f.label.toUpperCase()}</label>
+              {f.type === 'select' ? (
+                <select className="finput" value={vals[f.key] || 'homologacao'}
+                  onChange={e => setVals(v => ({ ...v, [f.key]: e.target.value }))}>
+                  {f.options.map(o => (
+                    <option key={o} value={o}>{o === 'homologacao' ? '🔧 Homologação (testes)' : '🚀 Produção (real)'}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  className="finput"
+                  type={f.type || 'text'}
+                  value={vals[f.key] || ''}
+                  onChange={e => setVals(v => ({ ...v, [f.key]: e.target.value }))}
+                  placeholder={f.placeholder}
+                  autoComplete="off"
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="cfg-card" style={{ background: 'var(--warn)11', border: '1px solid var(--warn)33' }}>
+        <div style={{ fontSize: '.82rem', color: 'var(--warn)', lineHeight: 1.65 }}>
+          ⚠ <strong>Atenção:</strong> O ambiente <em>Homologação</em> emite notas de teste (não têm validade fiscal).
+          Apenas troque para <em>Produção</em> após validar a integração e se certificar que os dados estão corretos.
+          Notas emitidas em produção <strong>não podem ser canceladas</strong> após 24h.
+        </div>
+      </div>
+
+      <button className="btn-primary" style={{ alignSelf: 'flex-start' }} onClick={save} disabled={saving}>
+        {saving ? 'Salvando…' : '💾 Salvar Configurações Fiscais'}
+      </button>
+    </div>
+  )
+}
+
 // ── Settings (main) ────────────────────────────────────────────────────────
 export default function Settings({ showToast, user, session }) {
   const [tab, setTab] = useState('setup')
@@ -683,6 +772,7 @@ export default function Settings({ showToast, user, session }) {
       {tab === 'users'     && <UsersPanel      showToast={showToast} user={user} />}
       {tab === 'api'       && <ApiDocs         showToast={showToast} />}
       {tab === 'branding'  && <BrandingPanel   showToast={showToast} />}
+      {tab === 'fiscal'    && <FiscalPanel     showToast={showToast} />}
     </div>
   )
 }
