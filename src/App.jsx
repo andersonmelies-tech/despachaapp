@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from './lib/supabase.js'
 import Login       from './components/Login.jsx'
+import LandingPage from './components/LandingPage.jsx'
 import Topbar      from './components/Topbar.jsx'
 import Sidebar     from './components/Sidebar.jsx'
 import Dashboard   from './components/Dashboard.jsx'
@@ -96,7 +97,7 @@ export default function App() {
     </div>
   )
 
-  if (!session) return <Login onLogin={s => setSession(s)} showToast={showToast} />
+  if (!session) return <LandingPage onLogin={s => setSession(s)} showToast={showToast} />
 
   const meta      = session.user?.user_metadata || {}
   const isSuperAdmin = session.user?.email === ADMIN_EMAIL || meta?.is_superadmin === true
@@ -154,7 +155,7 @@ export default function App() {
         />
         <div className="main">
           {tab === 'dashboard' && <Dashboard showToast={showToast} onStatsLoaded={setStats} />}
-          {tab === 'tasks'     && <Tasks key={tasksKey} showToast={showToast} sideFilter={sideFilter} user={meta} onStatsChange={() => setTasksKey(k => k + 1)} />}
+          {tab === 'tasks'     && <Tasks key={tasksKey} showToast={showToast} sideFilter={sideFilter} user={meta} plan={plan} onStatsChange={() => setTasksKey(k => k + 1)} />}
           {tab === 'calendar'  && <Calendar showToast={showToast} />}
           {tab === 'reports'   && <Reports  showToast={showToast} />}
           {tab === 'settings'  && <Settings showToast={showToast} user={meta} session={session} />}

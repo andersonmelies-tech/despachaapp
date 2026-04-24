@@ -15,7 +15,7 @@ function slaColor(pct) {
 }
 
 // ── Tasks (lista principal) ────────────────────────────────────────────────────
-export default function Tasks({ showToast, sideFilter, user }) {
+export default function Tasks({ showToast, sideFilter, user, plan }) {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [providers, setProviders] = useState([])
@@ -135,7 +135,7 @@ export default function Tasks({ showToast, sideFilter, user }) {
             >
               <span className="tid">#{t.id}</span>
               <span>
-                <div className="ttitle">{t.title}
+                <div className="ttitle">{t.title}{t.task_type === 'externo' && <span style={{ marginLeft: '.35rem', fontSize: '.72rem', color: 'var(--blue)' }} title="Tarefa externa">🌐</span>}
                   <small>
                     {t.requester} {t.sector && `· ${t.sector}`}
                     {t.provider_new_date && <span className="pnd-badge" title="Colaborador propôs nova data"> 📅</span>}
@@ -174,6 +174,7 @@ export default function Tasks({ showToast, sideFilter, user }) {
           providers={providers}
           sectors={sectors}
           slaConfig={slaConfig}
+          plan={plan}
           onClose={() => { setShowModal(false); setEditTask(null) }}
           onSave={() => {
             setShowModal(false); setEditTask(null)

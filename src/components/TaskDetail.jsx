@@ -33,7 +33,7 @@ function slaColor(pct) {
 }
 
 // ── TaskModal (criar/editar) ───────────────────────────────────────────────────
-export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave }) {
+export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave, plan }) {
   const isEdit = !!task?.id
   const [f, setF] = useState({
     title: task?.title || '',
@@ -51,9 +51,19 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
     photos: task?.photos ? JSON.parse(task.photos) : [],
     client_name: task?.client_name || '',
     client_address: task?.client_address || '',
+    task_type: task?.task_type || 'interno',
+    client_id: task?.client_id || '',
   })
   const [saving, setSaving] = useState(false)
+  const [clients, setClients] = useState([])
   const fileRef = useRef()
+
+  useEffect(() => {
+    if (plan === 'enterprise') {
+      supabase.from('clients').select('id,name').eq('active', true).order('name')
+        .then(r => setClients(r.data || []))
+    }
+  }, [plan])
 
   function set(k, v) { setF(p => ({ ...p, [k]: v })) }
 
@@ -113,6 +123,8 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
       photos: f.photos.length ? JSON.stringify(f.photos) : null,
       client_name: f.client_name || null,
       client_address: f.client_address || null,
+      task_type: f.task_type || 'interno',
+      client_id: f.client_id || null,
     }
 
     if (isEdit && task.urgency !== f.urgency) {
@@ -216,18 +228,52 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
                 <option value="cancelada">❌ Cancelada</option>
               </select>
             </div>
+            {(plan === 'pro' || plan === 'enterprise') && (
+              <div className="fg full">
+                <label className="flabel">TIPO DE SERVIÇO</label>
+                <div style={{ display: 'flex', gap: '.5rem' }}>
+                  {['interno', 'externo'].map(type => (
+                    <button key={type} type="button"
+                      onClick={() => setF(p => ({ ...p, task_type: type }))}
+                      style={{
+                        flex: 1, padding: '.6rem', borderRadius: 8, border: '1px solid',
+                        borderColor: f.task_type === type ? 'var(--blue)' : 'var(--border)',
+                        background: f.task_type === type ? '#3B82F620' : 'var(--s2)',
+                        color: f.task_type === type ? 'var(--blue)' : 'var(--muted)',
+                        fontWeight: f.task_type === type ? 700 : 400,
+                        cursor: 'pointer', fontSize: '.85rem', transition: 'all .15s',
+                      }}>
+                      {type === 'interno' ? '🏢 Interno' : '🌐 Externo'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="fg full">
               <label className="flabel">OBSERVAÇÕES</label>
               <textarea className="finput" style={{ minHeight: '55px' }} placeholder="Notas adicionais…" value={f.notes} onChange={e => set('notes', e.target.value)} />
             </div>
-            <div className="fg">
-              <label className="flabel">NOME DO CLIENTE <span style={{ fontSize: '.65rem', background: 'var(--blue)', color: '#fff', borderRadius: 4, padding: '1px 5px', marginLeft: '.3rem', letterSpacing: '.03em' }}>PRO</span></label>
-              <input className="finput" placeholder="Nome do cliente" value={f.client_name} onChange={e => set('client_name', e.target.value)} />
-            </div>
-            <div className="fg">
-              <label className="flabel">ENDEREÇO DO CLIENTE <span style={{ fontSize: '.65rem', background: 'var(--blue)', color: '#fff', borderRadius: 4, padding: '1px 5px', marginLeft: '.3rem', letterSpacing: '.03em' }}>PRO</span></label>
-              <input className="finput" placeholder="Endereço do cliente" value={f.client_address} onChange={e => set('client_address', e.target.value)} />
-            </div>
+            {f.task_type === 'externo' && (plan === 'pro' || plan === 'enterprise') && (
+              <>
+                <div className="fg">
+                  <label className="flabel">NOME DO CLIENTE <span style={{ fontSize: '.65rem', background: 'var(--blue)', color: '#fff', borderRadius: 4, padding: '1px 5px', marginLeft: '.3rem', letterSpacing: '.03em' }}>PRO</span></label>
+                  <input className="finput" placeholder="Nome do cliente" value={f.client_name} onChange={e => set('client_name', e.target.value)} />
+                </div>
+                <div className="fg">
+                  <label className="flabel">ENDEREÇO DO CLIENTE <span style={{ fontSize: '.65rem', background: 'var(--blue)', color: '#fff', borderRadius: 4, padding: '1px 5px', marginLeft: '.3rem', letterSpacing: '.03em' }}>PRO</span></label>
+                  <input className="finput" placeholder="Endereço do cliente" value={f.client_address} onChange={e => set('client_address', e.target.value)} />
+                </div>
+                {plan === 'enterprise' && (
+                  <div className="fg full">
+                    <label className="flabel">VINCULAR CLIENTE <span style={{fontSize:'.7rem',color:'var(--purple)',marginLeft:'.4rem'}}>ENTERPRISE</span></label>
+                    <select className="finput" value={f.client_id || ''} onChange={e => setF(p => ({ ...p, client_id: e.target.value }))}>
+                      <option value="">Selecione um cliente cadastrado...</option>
+                      {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                )}
+              </>
+            )}
             <div className="fg full">
               <label className="flabel">FOTOS / ANEXOS</label>
               <div className="photo-upload-area" onClick={() => fileRef.current.click()}>
