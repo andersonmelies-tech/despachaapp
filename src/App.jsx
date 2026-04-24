@@ -14,10 +14,11 @@ import Toast       from './components/Toast.jsx'
 import MobileNav   from './components/MobileNav.jsx'
 import Pricing     from './components/Pricing.jsx'
 import TrialBanner from './components/TrialBanner.jsx'
-import Clients       from './components/Clients.jsx'
-import Budgets       from './components/Budgets.jsx'
-import CashFlow      from './components/CashFlow.jsx'
-import ServiceOrders from './components/ServiceOrders.jsx'
+import Clients              from './components/Clients.jsx'
+import Budgets              from './components/Budgets.jsx'
+import CashFlow             from './components/CashFlow.jsx'
+import ServiceOrders        from './components/ServiceOrders.jsx'
+import CollaboratorPayments from './components/CollaboratorPayments.jsx'
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'admin@despachaapp.app'
 
@@ -161,10 +162,11 @@ export default function App() {
           {tab === 'reports'   && <Reports  showToast={showToast} />}
           {tab === 'settings'  && <Settings showToast={showToast} user={meta} session={session} />}
           {tab === 'admin'     && isSuperAdmin && <AdminPanel session={session} />}
-          {tab === 'clients'  && <Clients       showToast={showToast} />}
-          {tab === 'budgets'  && <Budgets       showToast={showToast} />}
-          {tab === 'cashflow' && <CashFlow      showToast={showToast} />}
-          {tab === 'serviceorders' && <ServiceOrders showToast={showToast} session={session} />}
+          {tab === 'clients'       && <Clients              showToast={showToast} />}
+          {tab === 'budgets'       && <Budgets              showToast={showToast} />}
+          {tab === 'cashflow'      && <CashFlow             showToast={showToast} />}
+          {tab === 'serviceorders' && <ServiceOrders        showToast={showToast} session={session} />}
+          {tab === 'payments'      && <CollaboratorPayments showToast={showToast} />}
         </div>
       </div>
 
