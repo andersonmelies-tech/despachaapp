@@ -53,7 +53,7 @@ export default async function handler(request) {
     try { body = await request.json() }
     catch { return err('Invalid JSON body') }
 
-    const { title, description, requester, assignee_id, sector, urgency, due_date } = body
+    const { title, description, requester, assignee_id, sector, urgency, due_date, client_name, client_address } = body
 
     if (!title)     return err('Field "title" is required')
     if (!requester) return err('Field "requester" is required')
@@ -71,9 +71,11 @@ export default async function handler(request) {
       assignee_id:  assignee_id || null,
       sector:       sector || null,
       urgency,
-      due_date:     due_date || null,
-      status:       'pendente',
-      company_id:   company.id,
+      due_date:      due_date || null,
+      status:        'pendente',
+      company_id:    company.id,
+      client_name:   client_name || null,
+      client_address: client_address || null,
     }
 
     const { data, error } = await supabase.from('tasks').insert(payload).select().single()

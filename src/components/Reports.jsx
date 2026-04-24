@@ -51,7 +51,7 @@ function taskToRow(t) {
   return {
     'ID': t.id,
     'Título': t.title || '',
-    'Prestador': t.assignee || '',
+    'Colaborador': t.assignee || '',
     'Setor': t.sector || '',
     'Urgência': t.urgency || '',
     'Status': t.status || '',
@@ -213,9 +213,9 @@ function ProviderTab({ tasks, providers }) {
 
   return (
     <div className="cfg-card" style={{ overflowX: 'auto' }}>
-      <div className="cfg-title">Por Prestador</div>
+      <div className="cfg-title">Por Colaborador</div>
       {rows.length === 0 ? (
-        <div className="empty">Nenhum prestador com tarefas no período</div>
+        <div className="empty">Nenhum colaborador com tarefas no período</div>
       ) : (
         <table className="rep-table">
           <thead>
@@ -430,7 +430,7 @@ function ExportTab({ tasks, providers, period }) {
 
     autoTable(doc, {
       startY,
-      head: [['#', 'Título', 'Prestador', 'Setor', 'Urgência', 'Status', 'Prazo', 'Criado', 'Concluído']],
+      head: [['#', 'Título', 'Colaborador', 'Setor', 'Urgência', 'Status', 'Prazo', 'Criado', 'Concluído']],
       body: rows,
       styles: { fontSize: 7.5, cellPadding: 2.5, textColor: [226,232,240], fillColor: [13,25,41] },
       headStyles: { fillColor: [26,51,86], textColor: [226,232,240], fontStyle: 'bold', fontSize: 8 },
@@ -450,7 +450,7 @@ function ExportTab({ tasks, providers, period }) {
 
   async function exportPDF_Providers() {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-    const startY = await buildPDFHeader(doc, 'Relatório por Prestador', periodLabel[period] || period)
+    const startY = await buildPDFHeader(doc, 'Relatório por Colaborador', periodLabel[period] || period)
 
     const rows = providers.map(p => {
       const pt = tasks.filter(t => t.assignee === p.name)
@@ -470,7 +470,7 @@ function ExportTab({ tasks, providers, period }) {
 
     autoTable(doc, {
       startY,
-      head: [['Prestador','Setor','Total','Concluídas','Andamento','Atrasadas','Tempo Médio','% Conclusão']],
+      head: [['Colaborador','Setor','Total','Concluídas','Andamento','Atrasadas','Tempo Médio','% Conclusão']],
       body: rows,
       styles: { fontSize: 8.5, cellPadding: 3, textColor: [226,232,240], fillColor: [13,25,41] },
       headStyles: { fillColor: [26,51,86], textColor: [226,232,240], fontStyle:'bold' },
@@ -482,7 +482,7 @@ function ExportTab({ tasks, providers, period }) {
         doc.text(`DespachaApp · ${companyName} · Página ${data.pageNumber}`, 10, pageH-6)
       }
     })
-    doc.save(`relatorio_prestadores_${new Date().toISOString().slice(0,10)}.pdf`)
+    doc.save(`relatorio_colaboradores_${new Date().toISOString().slice(0,10)}.pdf`)
   }
 
   async function exportPDF_Overview() {
@@ -569,7 +569,7 @@ function ExportTab({ tasks, providers, period }) {
         ? Math.round(fin.reduce((a,t) => a + t.elapsed_minutes, 0) / fin.length) : null
       const concluidas = pt.filter(t => t.status === 'concluida').length
       return {
-        'Prestador': p.name, 'Setor': p.sector || '',
+        'Colaborador': p.name, 'Setor': p.sector || '',
         'Total': pt.length, 'Concluídas': concluidas,
         'Em andamento': pt.filter(t => t.status==='em_andamento').length,
         'Atrasadas': pt.filter(t => isOverdue(t)).length,
@@ -577,7 +577,7 @@ function ExportTab({ tasks, providers, period }) {
         '% Conclusão': pt.length ? Math.round((concluidas/pt.length)*100) : 0,
       }
     })
-    exportCSV(rows, 'relatorio_prestadores.csv')
+    exportCSV(rows, 'relatorio_colaboradores.csv')
   }
 
   const exportGroups = [
@@ -587,7 +587,7 @@ function ExportTab({ tasks, providers, period }) {
       items: [
         { label: 'Resumo Executivo',       desc: 'KPIs gerais, taxa de conclusão, tempo médio',              fn: exportPDF_Overview  },
         { label: 'Todas as Tarefas',       desc: `${tasks.length} tarefas · tabela completa (landscape)`,   fn: exportPDF_Tasks     },
-        { label: 'Relatório por Prestador',desc: `${providers.length} prestadores com métricas de desempenho`, fn: exportPDF_Providers },
+        { label: 'Relatório por Colaborador',desc: `${providers.length} colaboradores com métricas de desempenho`, fn: exportPDF_Providers },
       ]
     },
     {
@@ -603,7 +603,7 @@ function ExportTab({ tasks, providers, period }) {
       items: [
         { label: 'Todas as tarefas',         desc: `${tasks.length} tarefas com todos os campos`, fn: dlTasks       },
         { label: 'Tarefas concluídas',        desc: `${tasks.filter(t=>t.status==='concluida').length} tarefas concluídas`, fn: dlDone },
-        { label: 'Relatório por prestador',   desc: `${providers.length} prestadores com métricas`, fn: dlProviders  },
+        { label: 'Relatório por colaborador',   desc: `${providers.length} colaboradores com métricas`, fn: dlProviders  },
       ]
     },
   ]
@@ -636,7 +636,7 @@ function ExportTab({ tasks, providers, period }) {
 
 const TABS = [
   { id: 'overview',  label: '📊 Visão Geral' },
-  { id: 'providers', label: '👤 Por Prestador' },
+  { id: 'providers', label: '👤 Por Colaborador' },
   { id: 'sectors',   label: '🏢 Por Setor' },
   { id: 'export',    label: '📤 Exportar' },
 ]

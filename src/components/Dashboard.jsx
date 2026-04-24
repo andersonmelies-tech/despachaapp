@@ -192,13 +192,13 @@ export default function Dashboard({ showToast, onStatsLoaded }) {
 
         {/* Por Prestador */}
         <div className="dash-panel">
-          <div className="dash-section-title">👤 Desempenho por Prestador</div>
+          <div className="dash-section-title">👤 Desempenho por Colaborador</div>
           {loading ? (
             <div className="dash-loading-rows">
               {[1,2,3].map(i => <div key={i} className="dash-skeleton" />)}
             </div>
           ) : (s.por_prestador || []).length === 0 ? (
-            <div className="empty">Nenhum prestador com tarefas</div>
+            <div className="empty">Nenhum colaborador com tarefas</div>
           ) : (s.por_prestador || []).map((p, i) => {
             const done = pct(p.concluidas, p.total)
             const late = pct(p.atrasadas, p.total)

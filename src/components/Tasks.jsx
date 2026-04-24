@@ -107,7 +107,7 @@ export default function Tasks({ showToast, sideFilter, user }) {
           {sectors.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
         </select>
         <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}>
-          <option value="">Todos prestadores</option>
+          <option value="">Todos colaboradores</option>
           {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
         <button className="btn-primary" onClick={() => { setEditTask(null); setShowModal(true) }}>+ Nova Tarefa</button>
@@ -116,7 +116,7 @@ export default function Tasks({ showToast, sideFilter, user }) {
       {/* Tabela */}
       <div className="tbl-wrap">
         <div className="tbl-head">
-          <span>#</span><span>Tarefa</span><span>Prestador</span>
+          <span>#</span><span>Tarefa</span><span>Colaborador</span>
           <span>Urgência</span><span>Status</span><span>Prazo</span><span>Ações</span>
         </div>
         {loading ? (
@@ -138,9 +138,10 @@ export default function Tasks({ showToast, sideFilter, user }) {
                 <div className="ttitle">{t.title}
                   <small>
                     {t.requester} {t.sector && `· ${t.sector}`}
-                    {t.provider_new_date && <span className="pnd-badge" title="Prestador propôs nova data"> 📅</span>}
-                    {t.provider_obs      && <span className="pnd-badge" title="Prestador adicionou observação"> 💬</span>}
+                    {t.provider_new_date && <span className="pnd-badge" title="Colaborador propôs nova data"> 📅</span>}
+                    {t.provider_obs      && <span className="pnd-badge" title="Colaborador adicionou observação"> 💬</span>}
                   </small>
+                  {t.client_name && <small style={{ display: 'block', color: 'var(--blue)', fontSize: '.72rem', marginTop: '.1rem' }}>👤 {t.client_name}</small>}
                 </div>
               </span>
               <span className="tassignee">{t.assignee}</span>

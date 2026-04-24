@@ -19,7 +19,7 @@ function makeWhatsappShare(link, providerName, companyName) {
 
 const TABS = [
   { id: 'setup',     label: '🚀 Configuração' },
-  { id: 'providers', label: '👤 Prestadores' },
+  { id: 'providers', label: '👤 Colaboradores' },
   { id: 'sla',       label: '⏱ SLA' },
   { id: 'sectors',   label: '🏢 Setores' },
   { id: 'users',     label: '👥 Usuários' },
@@ -81,15 +81,15 @@ function SetupPanel({ showToast }) {
 
       {/* Como funciona */}
       <div className="cfg-card">
-        <div className="cfg-title">🤖 Como os prestadores usam o bot</div>
+        <div className="cfg-title">🤖 Como os colaboradores usam o bot</div>
         <div className="setup-steps">
 
           <div className="setup-step">
             <div className="step-num">1</div>
             <div className="step-body">
-              <div className="step-title">Cadastre seus prestadores</div>
+              <div className="step-title">Cadastre seus colaboradores</div>
               <div className="step-desc">
-                Vá na aba <strong>👤 Prestadores</strong> e adicione cada prestador com o nome que ele usará.
+                Vá na aba <strong>👤 Colaboradores</strong> e adicione cada colaborador com o nome que ele usará.
                 O nome é usado para identificá-lo automaticamente no Telegram.
               </div>
             </div>
@@ -100,7 +100,7 @@ function SetupPanel({ showToast }) {
             <div className="step-body">
               <div className="step-title">Compartilhe o código de vinculação</div>
               <div className="step-desc">
-                Envie o comando abaixo para cada prestador pelo WhatsApp ou Telegram.
+                Envie o comando abaixo para cada colaborador pelo WhatsApp ou Telegram.
                 Ele só precisa abrir o bot e enviar esse comando — pronto.
               </div>
               {company?.invite_code ? (() => {
@@ -122,7 +122,7 @@ function SetupPanel({ showToast }) {
                       </a>
                     </div>
                     <div className="invite-code-hint">
-                      O prestador clica no link → Telegram abre → já fica vinculado automaticamente.
+                      O colaborador clica no link → Telegram abre → já fica vinculado automaticamente.
                       Nenhuma digitação necessária.
                     </div>
                   </div>
@@ -138,7 +138,7 @@ function SetupPanel({ showToast }) {
             <div className="step-body">
               <div className="step-title">Pronto — o bot funciona automaticamente</div>
               <div className="step-desc">
-                Sempre que uma tarefa for atribuída ao prestador, ele recebe uma notificação no Telegram.
+                Sempre que uma tarefa for atribuída ao colaborador, ele recebe uma notificação no Telegram.
                 Ele pode ver detalhes, atualizar status e enviar fotos direto pelo bot.
               </div>
             </div>
@@ -149,15 +149,15 @@ function SetupPanel({ showToast }) {
 
       {/* Status dos prestadores */}
       <div className="cfg-card">
-        <div className="cfg-title">📊 Status dos Prestadores</div>
+        <div className="cfg-title">📊 Status dos Colaboradores</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
-          <StatusRow ok={linked > 0}    label={`${linked} prestador(es) vinculado(s) ao Telegram`} />
-          <StatusRow ok={unlinked === 0} label={unlinked === 0 ? 'Todos os prestadores vinculados' : `${unlinked} prestador(es) ainda não vinculado(s)`} />
+          <StatusRow ok={linked > 0}    label={`${linked} colaborador(es) vinculado(s) ao Telegram`} />
+          <StatusRow ok={unlinked === 0} label={unlinked === 0 ? 'Todos os colaboradores vinculados' : `${unlinked} colaborador(es) ainda não vinculado(s)`} />
           <StatusRow ok={!!(cfg.company_name)} label="Nome da empresa configurado" />
         </div>
         {unlinked > 0 && (
           <div style={{ marginTop: '.75rem', fontSize: '.78rem', color: 'var(--muted)' }}>
-            ⚠ Prestadores não vinculados: {providers.filter(p => !p.chat_id).map(p => p.name).join(', ')}
+            ⚠ Colaboradores não vinculados: {providers.filter(p => !p.chat_id).map(p => p.name).join(', ')}
           </div>
         )}
       </div>
@@ -208,32 +208,32 @@ function ProvidersPanel({ showToast }) {
     showToast(`Link de ${p.name} copiado ✓`)
   }
 
-  function openNew()  { setEditing(null); setF({ name: '', sector: '', active: 1, chat_id: '' }); setModal(true) }
-  function openEdit(p) { setEditing(p); setF({ name: p.name, sector: p.sector || '', active: p.active, chat_id: p.chat_id || '' }); setModal(true) }
+  function openNew()  { setEditing(null); setF({ name: '', sector: '', active: 1, chat_id: '', is_third_party: false, payment_rate: '' }); setModal(true) }
+  function openEdit(p) { setEditing(p); setF({ name: p.name, sector: p.sector || '', active: p.active, chat_id: p.chat_id || '', is_third_party: p.is_third_party || false, payment_rate: p.payment_rate || '' }); setModal(true) }
 
   async function save() {
     if (!f.name.trim()) return alert('Nome obrigatório')
-    const payload = { name: f.name, sector: f.sector, active: f.active, chat_id: f.chat_id }
+    const payload = { name: f.name, sector: f.sector, active: f.active, chat_id: f.chat_id, is_third_party: f.is_third_party, payment_rate: f.payment_rate ? Number(f.payment_rate) : null }
     if (editing) await supabase.from('providers').update(payload).eq('id', editing.id)
     else         await supabase.from('providers').insert(payload)
-    showToast(editing ? 'Prestador atualizado ✓' : 'Prestador criado ✓')
+    showToast(editing ? 'Colaborador atualizado ✓' : 'Colaborador criado ✓')
     setModal(false); load()
   }
 
   async function del(id) {
-    if (!confirm('Desativar este prestador? As tarefas vinculadas serão preservadas.')) return
+    if (!confirm('Desativar este colaborador? As tarefas vinculadas serão preservadas.')) return
     const { error } = await supabase.from('providers').update({ active: 0 }).eq('id', id)
     if (error) { showToast('Erro: ' + error.message, 'err'); return }
-    showToast('Prestador desativado ✓'); load()
+    showToast('Colaborador desativado ✓'); load()
   }
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '.75rem' }}>
-        <button className="btn-primary" onClick={openNew}>+ Novo Prestador</button>
+        <button className="btn-primary" onClick={openNew}>+ Novo Colaborador</button>
       </div>
       <div className="cfg-card">
-        {providers.length === 0 ? <div className="empty">Nenhum prestador cadastrado</div> : providers.map(p => (
+        {providers.length === 0 ? <div className="empty">Nenhum colaborador cadastrado</div> : providers.map(p => (
           <div key={p.id} className="provider-row">
             <div className="provider-avatar">👷</div>
             <div className="provider-info">
@@ -242,7 +242,7 @@ function ProvidersPanel({ showToast }) {
                 {!p.active && <span style={{ color: 'var(--muted)', fontSize: '.72rem', marginLeft: '.4rem' }}>(inativo)</span>}
               </div>
               <div className={`provider-meta${p.chat_id ? ' chat-linked' : ''}`}>
-                {p.sector || 'Sem setor'} {p.chat_id ? ' · 🔗 Telegram vinculado' : ' · ⚠ Não vinculado'}
+                {p.sector || 'Sem setor'} {p.chat_id ? ' · 🔗 Telegram vinculado' : ' · ⚠ Não vinculado'}{p.is_third_party && <span style={{ marginLeft: '.4rem', fontSize: '.7rem', color: 'var(--warn)' }}>🔧 Terceirizado</span>}
               </div>
             </div>
             <div className="actions" style={{ display: 'flex', gap: '.35rem', alignItems: 'center' }}>
@@ -263,14 +263,14 @@ function ProvidersPanel({ showToast }) {
         <div className="overlay open" onClick={e => e.target.className === 'overlay open' && setModal(false)}>
           <div className="modal">
             <div className="mhead">
-              <span className="mtitle">{editing ? 'EDITAR PRESTADOR' : 'NOVO PRESTADOR'}</span>
+              <span className="mtitle">{editing ? 'EDITAR COLABORADOR' : 'NOVO COLABORADOR'}</span>
               <button className="mclose" onClick={() => setModal(false)}>✕</button>
             </div>
             <div className="mbody">
               <div className="fgrid">
                 <div className="fg full">
                   <label className="flabel">NOME *</label>
-                  <input className="finput" value={f.name} onChange={e => setF(p => ({ ...p, name: e.target.value }))} placeholder="Nome exatamente como o prestador usará no Telegram" />
+                  <input className="finput" value={f.name} onChange={e => setF(p => ({ ...p, name: e.target.value }))} placeholder="Nome exatamente como o colaborador usará no Telegram" />
                 </div>
                 <div className="fg">
                   <label className="flabel">SETOR</label>
@@ -286,11 +286,22 @@ function ProvidersPanel({ showToast }) {
                     <option value={0}>❌ Inativo</option>
                   </select>
                 </div>
+                <div className="fg">
+                  <label className="flabel">TIPO</label>
+                  <select className="finput" value={f.is_third_party ? '1' : '0'} onChange={e => setF(p => ({ ...p, is_third_party: e.target.value === '1' }))}>
+                    <option value="0">👤 Colaborador interno</option>
+                    <option value="1">🔧 Terceirizado</option>
+                  </select>
+                </div>
+                <div className="fg">
+                  <label className="flabel">VALOR POR SERVIÇO (R$)</label>
+                  <input className="finput" type="number" min="0" step="0.01" value={f.payment_rate || ''} onChange={e => setF(p => ({ ...p, payment_rate: e.target.value }))} placeholder="0,00" />
+                </div>
                 <div className="fg full">
                   <label className="flabel">CHAT ID TELEGRAM</label>
-                  <input className="finput" value={f.chat_id} onChange={e => setF(p => ({ ...p, chat_id: e.target.value }))} placeholder="Preenchido automaticamente quando o prestador usa /start no bot" />
+                  <input className="finput" value={f.chat_id} onChange={e => setF(p => ({ ...p, chat_id: e.target.value }))} placeholder="Preenchido automaticamente quando o colaborador usa /start no bot" />
                   <span style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: '.25rem' }}>
-                    O prestador só precisa abrir o bot no Telegram e digitar /start — o vínculo é automático pelo nome.
+                    O colaborador só precisa abrir o bot no Telegram e digitar /start — o vínculo é automático pelo nome.
                   </span>
                 </div>
               </div>
@@ -323,7 +334,7 @@ function SLAPanel({ showToast }) {
     <div className="cfg-card">
       <div className="cfg-title">⏱ Prazo de conclusão por urgência</div>
       <div style={{ fontSize: '.8rem', color: 'var(--muted)', marginBottom: '1rem' }}>
-        Define quantas horas o prestador tem para concluir a tarefa após a abertura.
+        Define quantas horas o colaborador tem para concluir a tarefa após a abertura.
       </div>
       {rows.map(row => (
         <div key={row.urgency} style={{ display: 'flex', alignItems: 'center', gap: '.75rem', padding: '.6rem 0', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>

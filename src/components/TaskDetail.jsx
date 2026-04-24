@@ -49,6 +49,8 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
     due_date: task?.due_date || '',
     notes: task?.notes || '',
     photos: task?.photos ? JSON.parse(task.photos) : [],
+    client_name: task?.client_name || '',
+    client_address: task?.client_address || '',
   })
   const [saving, setSaving] = useState(false)
   const fileRef = useRef()
@@ -109,6 +111,8 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
       sla_deadline: isEdit ? task.sla_deadline : sla_deadline,
       notes: f.notes,
       photos: f.photos.length ? JSON.stringify(f.photos) : null,
+      client_name: f.client_name || null,
+      client_address: f.client_address || null,
     }
 
     if (isEdit && task.urgency !== f.urgency) {
@@ -173,7 +177,7 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
               </select>
             </div>
             <div className="fg">
-              <label className="flabel">PRESTADOR *</label>
+              <label className="flabel">COLABORADOR *</label>
               <select className="finput" value={f.assignee_id || ''} onChange={e => selectProvider(e.target.value)}>
                 <option value="">Selecione...</option>
                 {providers.filter(p => p.active).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -215,6 +219,14 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
             <div className="fg full">
               <label className="flabel">OBSERVAÇÕES</label>
               <textarea className="finput" style={{ minHeight: '55px' }} placeholder="Notas adicionais…" value={f.notes} onChange={e => set('notes', e.target.value)} />
+            </div>
+            <div className="fg">
+              <label className="flabel">NOME DO CLIENTE <span style={{ fontSize: '.65rem', background: 'var(--blue)', color: '#fff', borderRadius: 4, padding: '1px 5px', marginLeft: '.3rem', letterSpacing: '.03em' }}>PRO</span></label>
+              <input className="finput" placeholder="Nome do cliente" value={f.client_name} onChange={e => set('client_name', e.target.value)} />
+            </div>
+            <div className="fg">
+              <label className="flabel">ENDEREÇO DO CLIENTE <span style={{ fontSize: '.65rem', background: 'var(--blue)', color: '#fff', borderRadius: 4, padding: '1px 5px', marginLeft: '.3rem', letterSpacing: '.03em' }}>PRO</span></label>
+              <input className="finput" placeholder="Endereço do cliente" value={f.client_address} onChange={e => set('client_address', e.target.value)} />
             </div>
             <div className="fg full">
               <label className="flabel">FOTOS / ANEXOS</label>
@@ -339,7 +351,7 @@ export default function TaskDetail({ task: initialTask, onClose, onUpdate, showT
           )}
           <div className="drow">
             <div><div className="dlabel">SOLICITANTE</div><div className="dval">{task.requester} {task.requester_sector && `· ${task.requester_sector}`}</div></div>
-            <div><div className="dlabel">PRESTADOR</div><div className="dval">{task.assignee}</div></div>
+            <div><div className="dlabel">COLABORADOR</div><div className="dval">{task.assignee}</div></div>
           </div>
           <div className="drow">
             <div><div className="dlabel">URGÊNCIA</div><div className="dval"><span className={`ubadge ${task.urgency}`}>{URG_LABEL[task.urgency]}</span></div></div>
@@ -359,18 +371,18 @@ export default function TaskDetail({ task: initialTask, onClose, onUpdate, showT
 
           {task.provider_obs && (
             <div style={{ marginBottom: '.85rem' }}>
-              <div className="dlabel">💬 OBSERVAÇÕES DO PRESTADOR</div>
+              <div className="dlabel">💬 OBSERVAÇÕES DO COLABORADOR</div>
               <div className="provider-obs-box">{task.provider_obs}</div>
             </div>
           )}
 
           {task.provider_new_date && (
             <div style={{ marginBottom: '.85rem' }}>
-              <div className="dlabel">📅 NOVA DATA PROPOSTA PELO PRESTADOR</div>
+              <div className="dlabel">📅 NOVA DATA PROPOSTA PELO COLABORADOR</div>
               <div className="provider-newdate-box">
                 <div className="provider-newdate-info">
                   <span className="provider-newdate-val">{fmtDate(task.provider_new_date)}</span>
-                  <span className="provider-newdate-caption">O prestador solicitou alteração do prazo de conclusão</span>
+                  <span className="provider-newdate-caption">O colaborador solicitou alteração do prazo de conclusão</span>
                 </div>
                 <div className="provider-newdate-actions">
                   <button className="btn-approve" onClick={approveNewDate}>✓ Aprovar</button>

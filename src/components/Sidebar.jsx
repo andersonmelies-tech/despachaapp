@@ -15,7 +15,7 @@ const FILTERS = [
   { id: 'criticas',     label: 'Críticas',     icon: '⚠',  statKey: 'criticas',     cls: 'bd-red' },
 ]
 
-export default function Sidebar({ tab, setTab, sideFilter, setSideFilter, stats, isSuperAdmin }) {
+export default function Sidebar({ tab, setTab, sideFilter, setSideFilter, stats, isSuperAdmin, plan }) {
   const s = stats || {}
   const isTasksTab = tab === 'tasks'
 
@@ -39,6 +39,23 @@ export default function Sidebar({ tab, setTab, sideFilter, setSideFilter, stats,
           </div>
         ))}
       </div>
+
+      {/* ── Enterprise ── */}
+      {(plan === 'enterprise' || isSuperAdmin) && (
+        <div className="sb-section">
+          <div className="sb-section-label">Enterprise</div>
+          {[
+            { id: 'clients',  icon: '👥', label: 'Clientes' },
+            { id: 'budgets',  icon: '💰', label: 'Orçamentos' },
+            { id: 'cashflow', icon: '💳', label: 'Caixa' },
+          ].map(item => (
+            <div key={item.id} className={`sb-item${tab === item.id ? ' active' : ''}`} onClick={() => setTab(item.id)}>
+              <span className="sb-icon">{item.icon}</span>
+              <span className="sb-label-text">{item.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Admin (superadmin only) ── */}
       {isSuperAdmin && (
