@@ -5,6 +5,7 @@ export const config = { runtime: 'edge' }
 const SB_URL     = process.env.SUPABASE_URL
 const SB_ANON   = process.env.SUPABASE_ANON_KEY
 const SB_SERVICE = process.env.SUPABASE_SERVICE_KEY
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@despachaapp.app'
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -37,11 +38,18 @@ export default async function handler(req) {
   const { data: { user: adminUser } } = await sbAnon.auth.getUser()
   if (!adminUser) return json({ error: 'Unauthorized' }, 401)
 
-  // Só admin e manager podem criar usuários
+  // Só admin/manager podem criar usuários (ou o super admin pelo e-mail)
   const role = adminUser.user_metadata?.role
-  if (!['admin', 'manager'].includes(role)) return json({ error: 'Forbidden' }, 403)
+  const isSuperAdmin = adminUser.email === ADMIN_EMAIL
+  if (!isSuperAdmin && !['admin', 'manager'].includes(role)) return json({ error: 'Forbidden' }, 403)
 
-  const company_id = adminUser.user_metadata?.company_id
+  // Super admin: busca company_id via service key (não tem company_id no metadata)
+  let company_id = adminUser.user_metadata?.company_id
+  if (!company_id && isSuperAdmin) {
+    const sbService0 = createClient(SB_URL, SB_SERVICE)
+    const { data: comp } = await sbService0.from('companies').select('id').limit(1).single()
+    company_id = comp?.id
+  }
   if (!company_id) return json({ error: 'Company not found' }, 400)
 
   const { name, username, password, role: newRole } = await req.json()
