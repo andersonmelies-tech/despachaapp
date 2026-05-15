@@ -139,6 +139,12 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
       }
     }
 
+    // Garante company_id no INSERT (não precisa no UPDATE pois a linha já existe)
+    if (!isEdit) {
+      const { data: { session } } = await supabase.auth.getSession()
+      payload.company_id = session?.user?.user_metadata?.company_id || null
+    }
+
     let error
     if (isEdit) {
       const r = await supabase.from('tasks').update(payload).eq('id', task.id)
