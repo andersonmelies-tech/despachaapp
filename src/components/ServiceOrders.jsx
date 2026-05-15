@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase.js'
+import { supabase, getCompanyId } from '../lib/supabase.js'
 
 const STATUS_CFG = {
   aberta:    { label: 'Aberta',     color: 'var(--blue)',   next: 'andamento' },
@@ -94,7 +94,9 @@ export default function ServiceOrders({ showToast, session }) {
     if (editing) {
       await supabase.from('service_orders').update(payload).eq('id', editing.id)
     } else {
-      await supabase.from('service_orders').insert(payload)
+      payload.company_id = await getCompanyId()
+      const { error } = await supabase.from('service_orders').insert(payload)
+      if (error) { showToast('Erro: ' + error.message, 'err'); setSaving(false); return }
     }
     showToast(editing ? 'OS atualizada ✓' : 'OS criada ✓')
     setSaving(false)

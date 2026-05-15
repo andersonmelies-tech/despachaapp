@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase.js'
+import { supabase, getCompanyId } from '../lib/supabase.js'
 
 const STATUS_CFG = {
   pendente:   { label: 'Pendente',   color: 'var(--warn)' },
@@ -38,14 +38,20 @@ export default function Budgets({ showToast }) {
     if (!f.title.trim()) return showToast('Título obrigatório', 'err')
     setSaving(true)
     const payload = { title: f.title, description: f.description, client_id: f.client_id || null, amount: Number(f.amount) || 0, status: f.status, due_date: f.due_date || null }
-    if (editing) await supabase.from('budgets').update(payload).eq('id', editing.id)
-    else await supabase.from('budgets').insert(payload)
+    if (editing) {
+      await supabase.from('budgets').update(payload).eq('id', editing.id)
+    } else {
+      payload.company_id = await getCompanyId()
+      const { error } = await supabase.from('budgets').insert(payload)
+      if (error) { showToast('Erro: ' + error.message, 'err'); setSaving(false); return }
+    }
     showToast(editing ? 'Orçamento atualizado ✓' : 'Orçamento criado ✓')
     setSaving(false); setModal(false); load()
   }
 
   async function convertToTask(b) {
     setConverting(b.id)
+    const company_id = await getCompanyId()
     const { data, error } = await supabase.from('tasks').insert({
       title: b.title,
       description: b.description || '',
@@ -53,6 +59,7 @@ export default function Budgets({ showToast }) {
       client_name: b.clients?.name || '',
       urgency: 'media',
       status: 'pendente',
+      company_id,
     }).select().single()
     if (error) { showToast('Erro ao converter', 'err'); setConverting(null); return }
     await supabase.from('budgets').update({ status: 'convertido', task_id: data.id }).eq('id', b.id)
@@ -62,6 +69,7 @@ export default function Budgets({ showToast }) {
 
   async function convertToOS(b) {
     setConvertingOS(b.id)
+    const company_id = await getCompanyId()
     const { data, error } = await supabase.from('service_orders').insert({
       title:       b.title,
       description: b.description || '',
@@ -69,6 +77,7 @@ export default function Budgets({ showToast }) {
       total_value: Number(b.amount) || 0,
       status:      'aberta',
       budget_id:   b.id,
+      company_id,
     }).select().single()
     if (error) { showToast('Erro ao criar OS: ' + error.message, 'err'); setConvertingOS(null); return }
     await supabase.from('budgets').update({ status: 'convertido', service_order_id: data.id }).eq('id', b.id)

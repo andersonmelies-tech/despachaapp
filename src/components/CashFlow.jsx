@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { supabase } from '../lib/supabase.js'
+import { supabase, getCompanyId } from '../lib/supabase.js'
 
 function fmtMoney(v) { return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }
 function fmt(v) { return v ? new Date(v + 'T12:00:00').toLocaleDateString('pt-BR') : '—' }
@@ -41,8 +41,13 @@ export default function CashFlow({ showToast }) {
     if (!f.description.trim() || !f.amount) return showToast('Preencha descrição e valor', 'err')
     setSaving(true)
     const payload = { type: f.type, category: f.category, description: f.description, amount: Number(f.amount), date: f.date, client_id: f.client_id || null, collaborator_id: f.collaborator_id || null, paid: f.paid }
-    if (editing) await supabase.from('cash_flow').update(payload).eq('id', editing.id)
-    else await supabase.from('cash_flow').insert(payload)
+    if (editing) {
+      await supabase.from('cash_flow').update(payload).eq('id', editing.id)
+    } else {
+      payload.company_id = await getCompanyId()
+      const { error } = await supabase.from('cash_flow').insert(payload)
+      if (error) { showToast('Erro: ' + error.message, 'err'); setSaving(false); return }
+    }
     showToast(editing ? 'Lançamento atualizado ✓' : 'Lançamento criado ✓')
     setSaving(false); setModal(false); load()
   }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { supabase } from '../lib/supabase.js'
+import { supabase, getCompanyId } from '../lib/supabase.js'
 
 function fmtMoney(v) {
   return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -141,6 +141,7 @@ export default function CollaboratorPayments({ showToast }) {
     setPaying(item.id + kind)
     const now = new Date().toISOString()
     const amount = Number(value) || 0
+    const company_id = await getCompanyId()
 
     if (kind === 'OS') {
       await supabase.from('service_orders').update({
@@ -168,6 +169,7 @@ export default function CollaboratorPayments({ showToast }) {
         date:            now.slice(0, 10),
         collaborator_id: collabId,
         paid:            true,
+        company_id,
       })
     }
 
@@ -181,6 +183,7 @@ export default function CollaboratorPayments({ showToast }) {
     if (!confirm(`Pagar todos os serviços pendentes de ${group.collab.name}?\nTotal: ${fmtMoney(group.total)}`)) return
     setPaying('all_' + group.collab.id)
     const now = new Date().toISOString()
+    const company_id = await getCompanyId()
 
     // OS
     for (const o of group.osItems) {
@@ -208,6 +211,7 @@ export default function CollaboratorPayments({ showToast }) {
         date:            now.slice(0, 10),
         collaborator_id: group.collab.id,
         paid:            true,
+        company_id,
       })
     }
 

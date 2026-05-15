@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase.js'
+import { supabase, getCompanyId } from '../lib/supabase.js'
 
 export default function Clients({ showToast }) {
   const [clients, setClients] = useState([])
@@ -22,8 +22,13 @@ export default function Clients({ showToast }) {
     if (!f.name.trim()) return showToast('Nome obrigatório', 'err')
     setSaving(true)
     const payload = { name: f.name, address: f.address, phone: f.phone, email: f.email, notes: f.notes }
-    if (editing) await supabase.from('clients').update(payload).eq('id', editing.id)
-    else await supabase.from('clients').insert(payload)
+    if (editing) {
+      await supabase.from('clients').update(payload).eq('id', editing.id)
+    } else {
+      payload.company_id = await getCompanyId()
+      const { error } = await supabase.from('clients').insert(payload)
+      if (error) { showToast('Erro: ' + error.message, 'err'); setSaving(false); return }
+    }
     showToast(editing ? 'Cliente atualizado ✓' : 'Cliente criado ✓')
     setSaving(false); setModal(false); load()
   }

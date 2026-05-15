@@ -5,6 +5,14 @@ const key = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export const supabase = createClient(url, key)
 
+// ── company_id helper ────────────────────────────────────────────────────────
+// Retorna o company_id da sessão ativa. Use sempre antes de INSERTs nas tabelas
+// com RLS baseada em company_id (clients, budgets, cash_flow, service_orders, etc.)
+export async function getCompanyId() {
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.user?.user_metadata?.company_id || null
+}
+
 // ── Auth helpers ──────────────────────────────────────────────────────────────
 export const DOMAIN = '@despachaapp.app'
 
