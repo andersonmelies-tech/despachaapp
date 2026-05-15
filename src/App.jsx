@@ -35,7 +35,7 @@ export default function App() {
   const [sideFilter,  setSideFilter]  = useState('all')
   const [toast,       setToast]       = useState({ msg: '', type: '', visible: false })
   const [stats,       setStats]       = useState(null)
-  const [tasksKey,    setTasksKey]    = useState(0)
+  const [statsKey,    setStatsKey]    = useState(0)
   const [company,     setCompany]     = useState(null)
   const [showPricing, setShowPricing] = useState(false)
 
@@ -156,8 +156,8 @@ export default function App() {
           plan={plan}
         />
         <div className="main">
-          {tab === 'dashboard' && <Dashboard showToast={showToast} onStatsLoaded={setStats} />}
-          {tab === 'tasks'     && <Tasks key={tasksKey} showToast={showToast} sideFilter={sideFilter} user={meta} plan={plan} onStatsChange={() => setTasksKey(k => k + 1)} />}
+          {tab === 'dashboard' && <Dashboard key={statsKey} showToast={showToast} onStatsLoaded={setStats} />}
+          {tab === 'tasks'     && <Tasks showToast={showToast} sideFilter={sideFilter} user={meta} plan={plan} onStatsChange={() => setStatsKey(k => k + 1)} />}
           {tab === 'calendar'  && <Calendar showToast={showToast} />}
           {tab === 'reports'   && <Reports  showToast={showToast} />}
           {tab === 'settings'  && <Settings showToast={showToast} user={meta} session={session} />}

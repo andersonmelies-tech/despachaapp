@@ -1,6 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase, isOverdue } from '../lib/supabase.js'
 import TaskDetail, { TaskModal, URG_LABEL, STA_LABEL, URGENCIES, STATUSES, fmtDate } from './TaskDetail.jsx'
+
+// ── Cache em nível de módulo: sobrevive a trocas de aba ───────────────────────
+// Ao voltar para Tarefas os dados aparecem instantaneamente enquanto atualiza em segundo plano
+const _cache = { tasks: [], providers: [], sectors: [], slaConfig: {}, loaded: false }
 
 function slaPercent(task) {
   if (!task.sla_deadline || !task.created_at) return 0
@@ -15,22 +19,32 @@ function slaColor(pct) {
 }
 
 // ── Tasks (lista principal) ────────────────────────────────────────────────────
-export default function Tasks({ showToast, sideFilter, user, plan }) {
-  const [tasks, setTasks] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [providers, setProviders] = useState([])
-  const [sectors, setSectors] = useState([])
-  const [slaConfig, setSlaConfig] = useState({})
-  const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState(sideFilter !== 'atrasadas' && sideFilter !== 'criticas' && sideFilter !== 'all' ? sideFilter : '')
+export default function Tasks({ showToast, sideFilter, user, plan, onStatsChange }) {
+  // Inicia com dados do cache para resposta imediata ao trocar de aba
+  const [tasks,    setTasks]    = useState(_cache.tasks)
+  const [loading,  setLoading]  = useState(!_cache.loaded)
+  const [refreshing, setRefreshing] = useState(false)
+  const [providers, setProviders] = useState(_cache.providers)
+  const [sectors,   setSectors]   = useState(_cache.sectors)
+  const [slaConfig, setSlaConfig] = useState(_cache.slaConfig)
+  const [search,      setSearch]      = useState('')
+  const [filterStatus,  setFilterStatus]  = useState(
+    sideFilter !== 'atrasadas' && sideFilter !== 'criticas' && sideFilter !== 'all' ? sideFilter : ''
+  )
   const [filterUrgency, setFilterUrgency] = useState(sideFilter === 'criticas' ? 'critica' : '')
-  const [filterSector, setFilterSector] = useState('')
-  const [filterAssignee, setFilterAssignee] = useState('')
-  const [showModal, setShowModal] = useState(false)
-  const [editTask, setEditTask] = useState(null)
+  const [filterSector,  setFilterSector]  = useState('')
+  const [filterAssignee,setFilterAssignee]= useState('')
+  const [showModal,  setShowModal]  = useState(false)
+  const [editTask,   setEditTask]   = useState(null)
   const [detailTask, setDetailTask] = useState(null)
+  const mountedRef = useRef(true)
 
-  useEffect(() => { loadAll() }, [])
+  useEffect(() => {
+    mountedRef.current = true
+    loadAll()
+    return () => { mountedRef.current = false }
+  }, [])
+
   useEffect(() => {
     if (sideFilter === 'all') { setFilterStatus(''); setFilterUrgency('') }
     else if (sideFilter === 'criticas') { setFilterStatus(''); setFilterUrgency('critica') }
@@ -39,20 +53,41 @@ export default function Tasks({ showToast, sideFilter, user, plan }) {
   }, [sideFilter])
 
   async function loadAll() {
-    setLoading(true)
+    // Se já tem cache, atualiza em segundo plano sem spinner
+    if (_cache.loaded) setRefreshing(true)
+    else setLoading(true)
+
     const [tr, pr, sr, slr] = await Promise.all([
       supabase.from('tasks').select('*').order('id', { ascending: false }),
       supabase.from('providers').select('*').eq('active', 1),
       supabase.from('sectors').select('*').eq('active', 1).order('name'),
       supabase.from('sla_config').select('*'),
     ])
-    setTasks(tr.data || [])
-    setProviders(pr.data || [])
-    setSectors(sr.data || [])
+
+    if (!mountedRef.current) return // componente desmontado entre tabs
+
+    const tasks = tr.data || []
+    const providers = pr.data || []
+    const sectors = sr.data || []
     const sla = {}
     ;(slr.data || []).forEach(r => { sla[r.urgency] = r })
+
+    // Atualiza cache do módulo
+    _cache.tasks     = tasks
+    _cache.providers = providers
+    _cache.sectors   = sectors
+    _cache.slaConfig = sla
+    _cache.loaded    = true
+
+    setTasks(tasks)
+    setProviders(providers)
+    setSectors(sectors)
     setSlaConfig(sla)
     setLoading(false)
+    setRefreshing(false)
+
+    // Notifica App.jsx para atualizar contadores do Dashboard/Sidebar
+    onStatsChange?.()
   }
 
   function filtered() {
@@ -91,7 +126,7 @@ export default function Tasks({ showToast, sideFilter, user, plan }) {
       {/* Controles */}
       <div className="ctrl-row">
         <div className="search-wrap">
-          🔍
+          {refreshing ? <span style={{ fontSize: '.75rem', animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</span> : '🔍'}
           <input placeholder="Buscar tarefas…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
