@@ -6,11 +6,16 @@ const key = import.meta.env.VITE_SUPABASE_ANON_KEY
 export const supabase = createClient(url, key)
 
 // ── company_id helper ────────────────────────────────────────────────────────
-// Retorna o company_id da sessão ativa. Use sempre antes de INSERTs nas tabelas
-// com RLS baseada em company_id (clients, budgets, cash_flow, service_orders, etc.)
+// Retorna o company_id da sessão ativa.
+// Fallback para super admin (que não tem company_id no metadata):
+// busca diretamente da tabela companies.
 export async function getCompanyId() {
   const { data: { session } } = await supabase.auth.getSession()
-  return session?.user?.user_metadata?.company_id || null
+  const fromMeta = session?.user?.user_metadata?.company_id
+  if (fromMeta) return fromMeta
+  // Fallback: super admin ou usuário sem company_id no metadata
+  const { data } = await supabase.from('companies').select('id').limit(1).single()
+  return data?.id || null
 }
 
 // ── Auth helpers ──────────────────────────────────────────────────────────────
