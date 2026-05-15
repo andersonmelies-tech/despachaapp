@@ -70,7 +70,9 @@ export default function Budgets({ showToast }) {
   const [converting,   setConverting]   = useState(null)   // → Tarefa
   const [refusing,     setRefusing]     = useState(null)   // recusar
   const [f, setF] = useState({
-    title: '', description: '', client_id: '', amount: '', status: 'pendente', due_date: ''
+    title: '', description: '', client_id: '', amount: '',
+    labor_value: '', materials_value: '',
+    status: 'pendente', due_date: ''
   })
 
   async function load() {
@@ -85,32 +87,48 @@ export default function Budgets({ showToast }) {
 
   function openNew() {
     setEditing(null)
-    setF({ title: '', description: '', client_id: '', amount: '', status: 'pendente', due_date: '' })
+    setF({ title: '', description: '', client_id: '', amount: '', labor_value: '', materials_value: '', status: 'pendente', due_date: '' })
     setModal(true)
   }
   function openEdit(b) {
     setEditing(b)
     setF({
-      title:       b.title,
-      description: b.description || '',
-      client_id:   b.client_id || '',
-      amount:      b.amount ? String(b.amount) : '',
-      status:      b.status,
-      due_date:    b.due_date || '',
+      title:           b.title,
+      description:     b.description || '',
+      client_id:       b.client_id || '',
+      amount:          b.amount ? String(b.amount) : '',
+      labor_value:     b.labor_value ? String(b.labor_value) : '',
+      materials_value: b.materials_value ? String(b.materials_value) : '',
+      status:          b.status,
+      due_date:        b.due_date || '',
     })
     setModal(true)
+  }
+
+  // Recalcula total quando mão de obra ou materiais mudam
+  function setLabor(v) {
+    const labor = Number(v) || 0
+    const mats  = Number(f.materials_value) || 0
+    setF(p => ({ ...p, labor_value: v, amount: labor + mats > 0 ? String(labor + mats) : p.amount }))
+  }
+  function setMaterials(v) {
+    const labor = Number(f.labor_value) || 0
+    const mats  = Number(v) || 0
+    setF(p => ({ ...p, materials_value: v, amount: labor + mats > 0 ? String(labor + mats) : p.amount }))
   }
 
   async function save() {
     if (!f.title.trim()) return showToast('Título obrigatório', 'err')
     setSaving(true)
     const payload = {
-      title:       f.title,
-      description: f.description,
-      client_id:   f.client_id || null,
-      amount:      Number(f.amount) || 0,
-      status:      f.status,
-      due_date:    f.due_date || null,
+      title:           f.title,
+      description:     f.description,
+      client_id:       f.client_id || null,
+      labor_value:     Number(f.labor_value) || 0,
+      materials_value: Number(f.materials_value) || 0,
+      amount:          Number(f.amount) || 0,
+      status:          f.status,
+      due_date:        f.due_date || null,
     }
     if (editing) {
       const { error } = await supabase.from('budgets').update(payload).eq('id', editing.id)
@@ -130,14 +148,16 @@ export default function Budgets({ showToast }) {
     setApproving(b.id)
     const company_id = await getCompanyId()
 
-    // 1. Cria a OS
+    // 1. Cria a OS herdando mão de obra e materiais do orçamento
     const { data: os, error: osErr } = await supabase.from('service_orders').insert({
-      title:       b.title,
-      description: b.description || '',
-      client_id:   b.client_id || null,
-      total_value: Number(b.amount) || 0,
-      status:      'aberta',
-      budget_id:   b.id,
+      title:           b.title,
+      description:     b.description || '',
+      client_id:       b.client_id || null,
+      total_value:     Number(b.amount) || 0,
+      labor_value:     Number(b.labor_value) || 0,
+      materials_value: Number(b.materials_value) || 0,
+      status:          'aberta',
+      budget_id:       b.id,
       company_id,
     }).select().single()
 
@@ -238,8 +258,14 @@ export default function Budgets({ showToast }) {
                   <tr key={b.id}>
                     <td style={{ fontWeight: 600 }}>{b.title}</td>
                     <td style={{ color: 'var(--muted)', fontSize: '.85rem' }}>{b.clients?.name || '—'}</td>
-                    <td style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--green)', whiteSpace: 'nowrap' }}>
-                      {fmtMoney(b.amount)}
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--green)' }}>{fmtMoney(b.amount)}</div>
+                      {(Number(b.labor_value) > 0 || Number(b.materials_value) > 0) && (
+                        <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: '.1rem', display: 'flex', gap: '.4rem' }}>
+                          {Number(b.labor_value) > 0 && <span>🔧 {fmtMoney(b.labor_value)}</span>}
+                          {Number(b.materials_value) > 0 && <span>🪛 {fmtMoney(b.materials_value)}</span>}
+                        </div>
+                      )}
                     </td>
                     <td style={{ fontFamily: 'var(--mono)', color: 'var(--muted)', fontSize: '.8rem' }}>{fmt(b.due_date)}</td>
                     <td>
@@ -326,13 +352,63 @@ export default function Budgets({ showToast }) {
                   </select>
                 </div>
 
-                <div className="fg">
-                  <label className="flabel">VALOR</label>
-                  <CurrencyInput
-                    value={f.amount}
-                    onChange={v => setF(p => ({ ...p, amount: v }))}
-                  />
+                {/* ── Valores ── */}
+                <div className="fg full">
+                  <div style={{ borderTop: '1px solid var(--border)', margin: '.1rem 0 .6rem', opacity: .4 }} />
+                  <div style={{ fontSize: '.72rem', color: 'var(--muted)', letterSpacing: '.08em', fontFamily: 'var(--mono)', marginBottom: '.5rem' }}>
+                    💰 COMPOSIÇÃO DE VALORES
+                  </div>
                 </div>
+
+                <div className="fg">
+                  <label className="flabel">🔧 MÃO DE OBRA</label>
+                  <CurrencyInput value={f.labor_value} onChange={setLabor} />
+                </div>
+
+                <div className="fg">
+                  <label className="flabel">🪛 MATERIAIS</label>
+                  <CurrencyInput value={f.materials_value} onChange={setMaterials} />
+                </div>
+
+                <div className="fg full">
+                  <label className="flabel">
+                    VALOR TOTAL
+                    {(Number(f.labor_value) > 0 || Number(f.materials_value) > 0) && (
+                      <span style={{ marginLeft: '.5rem', fontSize: '.68rem', color: 'var(--muted)', fontWeight: 400 }}>
+                        (calculado automaticamente — edite se necessário)
+                      </span>
+                    )}
+                  </label>
+                  <CurrencyInput value={f.amount} onChange={v => setF(p => ({ ...p, amount: v }))} />
+                </div>
+
+                {/* Prévia dos valores */}
+                {Number(f.amount) > 0 && (
+                  <div className="fg full">
+                    <div style={{
+                      padding: '.65rem 1rem', background: 'var(--green)0d',
+                      border: '1px solid var(--green)33', borderRadius: 8,
+                      display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {Number(f.labor_value) > 0 && (
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginBottom: '.15rem' }}>Mão de Obra</div>
+                          <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--blue)' }}>{fmtMoney(f.labor_value)}</div>
+                        </div>
+                      )}
+                      {Number(f.materials_value) > 0 && (
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginBottom: '.15rem' }}>Materiais</div>
+                          <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--warn)' }}>{fmtMoney(f.materials_value)}</div>
+                        </div>
+                      )}
+                      <div style={{ textAlign: 'center', paddingLeft: Number(f.labor_value) > 0 || Number(f.materials_value) > 0 ? '.75rem' : 0, borderLeft: Number(f.labor_value) > 0 || Number(f.materials_value) > 0 ? '1px solid var(--border)' : 'none' }}>
+                        <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginBottom: '.15rem' }}>Total</div>
+                        <div style={{ fontFamily: 'var(--mono)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--green)' }}>{fmtMoney(f.amount)}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="fg">
                   <label className="flabel">PRAZO</label>
@@ -359,20 +435,6 @@ export default function Budgets({ showToast }) {
                 </div>
 
               </div>
-
-              {/* Prévia do valor */}
-              {f.amount && Number(f.amount) > 0 && (
-                <div style={{
-                  marginTop: '.75rem', padding: '.65rem 1rem',
-                  background: 'var(--green)11', border: '1px solid var(--green)33',
-                  borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                }}>
-                  <span style={{ fontSize: '.8rem', color: 'var(--muted)' }}>Valor do orçamento</span>
-                  <span style={{ fontFamily: 'var(--mono)', fontWeight: 800, fontSize: '1.1rem', color: 'var(--green)' }}>
-                    {fmtMoney(f.amount)}
-                  </span>
-                </div>
-              )}
             </div>
 
             <div className="mfoot">
@@ -385,11 +447,14 @@ export default function Budgets({ showToast }) {
                     setSaving(true)
                     const company_id = await getCompanyId()
                     const { data: bud, error } = await supabase.from('budgets').insert({
-                      title: f.title, description: f.description,
-                      client_id: f.client_id || null,
-                      amount: Number(f.amount) || 0,
-                      status: 'pendente',
-                      due_date: f.due_date || null,
+                      title:           f.title,
+                      description:     f.description,
+                      client_id:       f.client_id || null,
+                      amount:          Number(f.amount) || 0,
+                      labor_value:     Number(f.labor_value) || 0,
+                      materials_value: Number(f.materials_value) || 0,
+                      status:          'pendente',
+                      due_date:        f.due_date || null,
                       company_id,
                     }).select('*, clients(name)').single()
                     if (error) { showToast('Erro: ' + error.message, 'err'); setSaving(false); return }
