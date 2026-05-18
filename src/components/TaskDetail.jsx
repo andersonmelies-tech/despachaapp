@@ -159,6 +159,14 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
     } else {
       const r = await supabase.from('tasks').insert(payload).select().single()
       error = r.error
+      // Notifica o prestador no Telegram (fire-and-forget)
+      if (!error && r.data?.id) {
+        fetch('/api/telegram/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ task_id: r.data.id }),
+        }).catch(() => {})
+      }
     }
 
     setSaving(false)
