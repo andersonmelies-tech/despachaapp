@@ -1,5 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { fetchStats, supabase } from '../lib/supabase.js'
+import { cacheGet, cacheSet } from '../lib/cache.js'
+
+const _dc = { stats: null, dates: [], loaded: false }
 
 function fmtMin(m) {
   if (!m) return '–'
@@ -38,9 +41,15 @@ const CARD_CFG = [
 ]
 
 export default function Dashboard({ showToast, onStatsLoaded }) {
-  const [stats,        setStats]        = useState(null)
-  const [loading,      setLoading]      = useState(true)
-  const [pendingDates, setPendingDates] = useState([])
+  const [stats,        setStats]        = useState(_dc.stats)
+  const [loading,      setLoading]      = useState(!_dc.loaded)
+  const [pendingDates, setPendingDates] = useState(_dc.dates)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   async function loadPendingDates() {
     const { data } = await supabase
@@ -49,16 +58,21 @@ export default function Dashboard({ showToast, onStatsLoaded }) {
       .not('provider_new_date', 'is', null)
       .not('status', 'in', '("concluida","cancelada")')
       .order('id', { ascending: false })
-    setPendingDates(data || [])
+    if (!mountedRef.current) return
+    _dc.dates = data || []
+    setPendingDates(_dc.dates)
   }
 
   async function load() {
-    setLoading(true)
+    if (!_dc.loaded) setLoading(true)
     const s = await fetchStats()
+    if (!mountedRef.current) return
+    _dc.stats  = s
+    _dc.loaded = true
     setStats(s)
+    setLoading(false)
     if (onStatsLoaded) onStatsLoaded(s)
     await loadPendingDates()
-    setLoading(false)
   }
 
   async function approveDate(task) {

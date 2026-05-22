@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase, getCompanyId } from '../lib/supabase.js'
+
+const _soc = { orders: [], clients: [], collabs: [], loaded: false }
 
 const STATUS_CFG = {
   aberta:    { label: 'Aberta',     color: 'var(--blue)',   next: 'andamento' },
@@ -28,16 +30,24 @@ const EMPTY_FORM = {
 }
 
 export default function ServiceOrders({ showToast, session }) {
-  const [orders,   setOrders]   = useState([])
-  const [clients,  setClients]  = useState([])
-  const [collabs,  setCollabs]  = useState([])
+  const [orders,   setOrders]   = useState(_soc.orders)
+  const [clients,  setClients]  = useState(_soc.clients)
+  const [collabs,  setCollabs]  = useState(_soc.collabs)
   const [modal,    setModal]    = useState(false)
   const [editing,  setEditing]  = useState(null)
   const [saving,   setSaving]   = useState(false)
   const [emitting, setEmitting] = useState(null)
+  const [loading,  setLoading]  = useState(!_soc.loaded)
   const [f, setF] = useState(EMPTY_FORM)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   async function load() {
+    if (!_soc.loaded) setLoading(true)
     const [or, cl, co] = await Promise.all([
       supabase.from('service_orders')
         .select('*, clients(name), providers(name)')
@@ -45,9 +55,15 @@ export default function ServiceOrders({ showToast, session }) {
       supabase.from('clients').select('id, name').eq('active', true).order('name'),
       supabase.from('providers').select('id, name').eq('active', 1).order('name'),
     ])
-    setOrders(or.data || [])
-    setClients(cl.data || [])
-    setCollabs(co.data || [])
+    if (!mountedRef.current) return
+    _soc.orders  = or.data || []
+    _soc.clients = cl.data || []
+    _soc.collabs = co.data || []
+    _soc.loaded  = true
+    setOrders(_soc.orders)
+    setClients(_soc.clients)
+    setCollabs(_soc.collabs)
+    setLoading(false)
   }
 
   useEffect(() => { load() }, [])

@@ -1,5 +1,7 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase, getCompanyId } from '../lib/supabase.js'
+
+const _cpc = { collabs: [], osItems: [], taskItems: [], loaded: false }
 
 function fmtMoney(v) {
   return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -36,16 +38,24 @@ function CollabSummaryCard({ name, pending, total, onClick }) {
 }
 
 export default function CollaboratorPayments({ showToast }) {
-  const [collabs,    setCollabs]    = useState([])   // terceirizados
-  const [osItems,    setOsItems]    = useState([])   // OS pendentes
-  const [taskItems,  setTaskItems]  = useState([])   // Tarefas pendentes
-  const [selectedId, setSelectedId] = useState(null) // colaborador selecionado
-  const [paying,     setPaying]     = useState(null) // id do item sendo pago
-  const [tab,        setTab]        = useState('pendente') // pendente | pago
-  const [history,    setHistory]    = useState([])   // itens pagos
+  const [collabs,    setCollabs]    = useState(_cpc.collabs)
+  const [osItems,    setOsItems]    = useState(_cpc.osItems)
+  const [taskItems,  setTaskItems]  = useState(_cpc.taskItems)
+  const [selectedId, setSelectedId] = useState(null)
+  const [paying,     setPaying]     = useState(null)
+  const [tab,        setTab]        = useState('pendente')
+  const [history,    setHistory]    = useState([])
+  const [loading,    setLoading]    = useState(!_cpc.loaded)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   // ── Carrega dados ─────────────────────────────────────────────────────────
   async function load() {
+    if (!_cpc.loaded) setLoading(true)
     const [pr, osr, tkr] = await Promise.all([
       // Colaboradores terceirizados ativos
       supabase.from('providers')
@@ -76,9 +86,15 @@ export default function CollaboratorPayments({ showToast }) {
     // Filtra tarefas que realmente são de terceirizados
     const filteredTasks = (tkr.data || []).filter(t => t.providers?.is_third_party)
 
-    setCollabs(pr.data || [])
-    setOsItems(filteredOS)
-    setTaskItems(filteredTasks)
+    if (!mountedRef.current) return
+    _cpc.collabs   = pr.data || []
+    _cpc.osItems   = filteredOS
+    _cpc.taskItems = filteredTasks
+    _cpc.loaded    = true
+    setCollabs(_cpc.collabs)
+    setOsItems(_cpc.osItems)
+    setTaskItems(_cpc.taskItems)
+    setLoading(false)
   }
 
   async function loadHistory() {

@@ -1,5 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase, getCompanyId } from '../lib/supabase.js'
+
+const _clc = { data: [], loaded: false }
 
 // ── Estados brasileiros ───────────────────────────────────────────────────────
 const ESTADOS = [
@@ -70,7 +72,7 @@ const EMPTY = {
 }
 
 export default function Clients({ showToast }) {
-  const [clients,  setClients]  = useState([])
+  const [clients,  setClients]  = useState(_clc.data)
   const [modal,    setModal]    = useState(false)
   const [editing,  setEditing]  = useState(null)
   const [f,        setF]        = useState(EMPTY)
@@ -78,10 +80,19 @@ export default function Clients({ showToast }) {
   const [search,   setSearch]   = useState('')
   const [cities,   setCities]   = useState([])
   const [loadingCities, setLoadingCities] = useState(false)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   async function load() {
     const { data } = await supabase.from('clients').select('*').eq('active', true).order('name')
-    setClients(data || [])
+    if (!mountedRef.current) return
+    _clc.data   = data || []
+    _clc.loaded = true
+    setClients(_clc.data)
   }
   useEffect(() => { load() }, [])
 

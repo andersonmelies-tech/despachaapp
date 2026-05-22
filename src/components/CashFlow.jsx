@@ -1,28 +1,44 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase, getCompanyId } from '../lib/supabase.js'
 
 function fmtMoney(v) { return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }
 function fmt(v) { return v ? new Date(v + 'T12:00:00').toLocaleDateString('pt-BR') : '—' }
 
+const _cc = { entries: [], clients: [], collabs: [], loaded: false }
+
 export default function CashFlow({ showToast }) {
-  const [entries,  setEntries]  = useState([])
-  const [clients,  setClients]  = useState([])
-  const [collaborators, setCollaborators] = useState([])
+  const [entries,  setEntries]  = useState(_cc.entries)
+  const [clients,  setClients]  = useState(_cc.clients)
+  const [collaborators, setCollaborators] = useState(_cc.collabs)
   const [modal,    setModal]    = useState(false)
   const [editing,  setEditing]  = useState(null)
   const [saving,   setSaving]   = useState(false)
   const [filter,   setFilter]   = useState('all') // all | receita | despesa
+  const [loading,  setLoading]  = useState(!_cc.loaded)
   const [f, setF] = useState({ type: 'receita', category: '', description: '', amount: '', date: new Date().toISOString().slice(0,10), client_id: '', collaborator_id: '', paid: false })
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   async function load() {
+    if (!_cc.loaded) setLoading(true)
     const [er, cr, pr] = await Promise.all([
       supabase.from('cash_flow').select('*, clients(name), providers(name)').order('date', { ascending: false }),
       supabase.from('clients').select('id,name').eq('active', true).order('name'),
       supabase.from('providers').select('id,name').eq('active', 1).order('name'),
     ])
-    setEntries(er.data || [])
-    setClients(cr.data || [])
-    setCollaborators(pr.data || [])
+    if (!mountedRef.current) return
+    _cc.entries = er.data || []
+    _cc.clients = cr.data || []
+    _cc.collabs = pr.data || []
+    _cc.loaded  = true
+    setEntries(_cc.entries)
+    setClients(_cc.clients)
+    setCollaborators(_cc.collabs)
+    setLoading(false)
   }
   useEffect(() => { load() }, [])
 
