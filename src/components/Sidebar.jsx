@@ -15,7 +15,7 @@ const FILTERS = [
   { id: 'criticas',     label: 'Críticas',     icon: '⚠',  statKey: 'criticas',     cls: 'bd-red' },
 ]
 
-export default function Sidebar({ tab, setTab, sideFilter, setSideFilter, stats, isSuperAdmin, plan }) {
+export default function Sidebar({ tab, setTab, sideFilter, setSideFilter, stats, isSuperAdmin, plan, pendingRequests }) {
   const s = stats || {}
   const isTasksTab = tab === 'tasks'
 
@@ -38,6 +38,21 @@ export default function Sidebar({ tab, setTab, sideFilter, setSideFilter, stats,
             )}
           </div>
         ))}
+      </div>
+
+      {/* ── Solicitações Públicas ── */}
+      <div className="sb-section">
+        <div className="sb-section-label">Solicitações</div>
+        <div
+          className={`sb-item${tab === 'requests' ? ' active' : ''}`}
+          onClick={() => setTab('requests')}
+        >
+          <span className="sb-icon">📥</span>
+          <span className="sb-label-text">Fila de Pedidos</span>
+          {pendingRequests > 0 && (
+            <span className="badge bd-red">{pendingRequests}</span>
+          )}
+        </div>
       </div>
 
       {/* ── Enterprise ── */}

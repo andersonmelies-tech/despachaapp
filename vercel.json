@@ -2,5 +2,8 @@
   "crons": [
     { "path": "/api/cron/sla-check",     "schedule": "0 9 * * *" },
     { "path": "/api/cron/weekly-report", "schedule": "0 11 * * 1" }
+  ],
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

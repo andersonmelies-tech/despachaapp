@@ -19,6 +19,8 @@ import Budgets              from './components/Budgets.jsx'
 import CashFlow             from './components/CashFlow.jsx'
 import ServiceOrders        from './components/ServiceOrders.jsx'
 import CollaboratorPayments from './components/CollaboratorPayments.jsx'
+import RequestQueue         from './components/RequestQueue.jsx'
+import PublicRequestForm    from './components/PublicRequestForm.jsx'
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'admin@despachaapp.app'
 
@@ -34,10 +36,22 @@ export default function App() {
   const [tab,         setTab]         = useState('dashboard')
   const [sideFilter,  setSideFilter]  = useState('all')
   const [toast,       setToast]       = useState({ msg: '', type: '', visible: false })
-  const [stats,       setStats]       = useState(null)
-  const [statsKey,    setStatsKey]    = useState(0)
-  const [company,     setCompany]     = useState(null)
-  const [showPricing, setShowPricing] = useState(false)
+  const [stats,           setStats]           = useState(null)
+  const [statsKey,        setStatsKey]        = useState(0)
+  const [company,         setCompany]         = useState(null)
+  const [showPricing,     setShowPricing]     = useState(false)
+  const [pendingRequests, setPendingRequests] = useState(0)
+
+  // Carrega contagem inicial de solicitações pendentes
+  useEffect(() => {
+    if (!session) return
+    supabase.from('tasks')
+      .select('id', { count: 'exact', head: true })
+      .eq('source', 'publico')
+      .eq('needs_approval', true)
+      .neq('status', 'cancelada')
+      .then(({ count }) => { if (count != null) setPendingRequests(count) })
+  }, [session])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -153,7 +167,7 @@ export default function App() {
           tab={tab}         setTab={handleSetTab}
           sideFilter={sideFilter} setSideFilter={handleSideFilter}
           stats={stats}    isSuperAdmin={isSuperAdmin}
-          plan={plan}
+          plan={plan}      pendingRequests={pendingRequests}
         />
         <div className="main">
           {tab === 'dashboard' && <Dashboard key={statsKey} showToast={showToast} onStatsLoaded={setStats} />}
@@ -167,6 +181,7 @@ export default function App() {
           {tab === 'cashflow'      && <CashFlow             showToast={showToast} />}
           {tab === 'serviceorders' && <ServiceOrders        showToast={showToast} session={session} />}
           {tab === 'payments'      && <CollaboratorPayments showToast={showToast} />}
+          {tab === 'requests'      && <RequestQueue showToast={showToast} onCountChange={setPendingRequests} />}
         </div>
       </div>
 
