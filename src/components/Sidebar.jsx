@@ -1,9 +1,10 @@
 const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard',     icon: '▦'  },
-  { id: 'tasks',     label: 'Tarefas',       icon: '≡'  },
-  { id: 'calendar',  label: 'Agenda',        icon: '📅' },
-  { id: 'reports',   label: 'Relatórios',    icon: '📊' },
-  { id: 'settings',  label: 'Configurações', icon: '⚙'  },
+  { id: 'dashboard',   label: 'Dashboard',     icon: '▦'  },
+  { id: 'tasks',       label: 'Tarefas',       icon: '≡'  },
+  { id: 'recurrences', label: 'Recorrências',  icon: '🔄' },
+  { id: 'calendar',    label: 'Agenda',        icon: '📅' },
+  { id: 'reports',     label: 'Relatórios',    icon: '📊' },
+  { id: 'settings',    label: 'Configurações', icon: '⚙'  },
 ]
 
 const FILTERS = [

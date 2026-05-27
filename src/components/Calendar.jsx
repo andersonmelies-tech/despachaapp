@@ -76,9 +76,9 @@ export default function Calendar({ showToast }) {
                   key={t.id}
                   className={`cal-task-chip ${t.status === 'concluida' ? 'concluida' : t.urgency}`}
                   onClick={e => { e.stopPropagation(); setDetailTask(t) }}
-                  title={`#${t.id} — ${t.title}`}
+                  title={`${t.recurrence_id ? '🔄 Recorrente — ' : ''}#${t.id} — ${t.title}`}
                 >
-                  #{t.id} {t.title}
+                  {t.recurrence_id ? '🔄 ' : ''}#{t.id} {t.title}
                 </div>
               ))}
               {dayTasks.length > 3 && (

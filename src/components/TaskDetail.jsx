@@ -32,6 +32,18 @@ function slaColor(pct) {
   return 'var(--green)'
 }
 
+const REC_DOW_OPTS = [
+  { value: 1, label: 'Seg' }, { value: 2, label: 'Ter' }, { value: 3, label: 'Qua' },
+  { value: 4, label: 'Qui' }, { value: 5, label: 'Sex' }, { value: 6, label: 'Sáb' },
+  { value: 0, label: 'Dom' },
+]
+const REC_DUR_OPTS = [
+  { value: 0,   label: 'Para sempre' },
+  { value: 30,  label: '30 dias'     },
+  { value: 60,  label: '60 dias'     },
+  { value: 120, label: '120 dias'    },
+]
+
 // ── TaskModal (criar/editar) ───────────────────────────────────────────────────
 export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave, plan }) {
   const isEdit = !!task?.id
@@ -54,6 +66,13 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
     task_type: task?.task_type || 'interno',
     client_id: task?.client_id || '',
   })
+  // Recorrência (só na criação)
+  const [recOn,   setRecOn]   = useState(false)
+  const [recFreq, setRecFreq] = useState('weekly')
+  const [recDow,  setRecDow]  = useState(5)   // Sexta por padrão
+  const [recDom,  setRecDom]  = useState(1)
+  const [recDur,  setRecDur]  = useState(0)   // 0 = para sempre
+
   const [saving, setSaving] = useState(false)
   const [clients, setClients] = useState([])
   const fileRef = useRef()
@@ -104,6 +123,45 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
     if (!f.requester.trim()) return alert('Solicitante obrigatório')
     if (!f.assignee.trim()) return alert('Prestador obrigatório')
     setSaving(true)
+
+    // ── CRIAÇÃO COM RECORRÊNCIA ──────────────────────────────────────────────
+    if (!isEdit && recOn) {
+      let end_date = null
+      if (recDur > 0) {
+        const ed = new Date()
+        ed.setDate(ed.getDate() + recDur)
+        end_date = ed.toISOString().split('T')[0]
+      }
+      const { data: { session } } = await supabase.auth.getSession()
+      const { data: recRow, error: recErr } = await supabase.from('task_recurrences').insert({
+        title:            f.title.trim(),
+        description:      f.description.trim() || null,
+        requester:        f.requester.trim(),
+        requester_sector: f.requester_sector || null,
+        assignee_id:      f.assignee_id || null,
+        assignee:         f.assignee,
+        urgency:          f.urgency,
+        category:         f.category || null,
+        sector:           f.sector   || null,
+        frequency:        recFreq,
+        day_of_week:      recFreq === 'weekly'  ? Number(recDow) : null,
+        day_of_month:     recFreq === 'monthly' ? Number(recDom) : null,
+        start_date:       new Date().toISOString().split('T')[0],
+        end_date,
+        company_id:       session?.user?.user_metadata?.company_id || null,
+      }).select('id').single()
+      if (recErr) { alert('Erro: ' + recErr.message); setSaving(false); return }
+      // Gera as primeiras tarefas imediatamente
+      fetch('/api/cron/gen-recurring', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recurrence_id: recRow.id }),
+      }).catch(() => {})
+      setSaving(false)
+      onSave()
+      return
+    }
+    // ── FIM RECORRÊNCIA ──────────────────────────────────────────────────────
 
     const now = new Date()
     const sla_deadline = isEdit ? task.sla_deadline : calcSlaDeadline(f.urgency, now)
@@ -306,6 +364,97 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
                 </div>
               )}
             </div>
+
+            {/* ── Recorrência (só na criação) ── */}
+            {!isEdit && (
+              <div className="fg full" style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '.65rem', cursor: 'pointer', userSelect: 'none', marginBottom: recOn ? '1rem' : 0 }}
+                  onClick={() => setRecOn(v => !v)}
+                >
+                  <div style={{
+                    width: 38, height: 22, borderRadius: 11, transition: 'background .2s',
+                    background: recOn ? 'var(--blue)' : 'var(--border)',
+                    position: 'relative', flexShrink: 0,
+                  }}>
+                    <div style={{
+                      position: 'absolute', top: 3, left: recOn ? 18 : 3,
+                      width: 16, height: 16, borderRadius: '50%', background: '#fff',
+                      transition: 'left .2s', boxShadow: '0 1px 3px #0003',
+                    }} />
+                  </div>
+                  <span style={{ fontSize: '.85rem', fontWeight: recOn ? 700 : 400, color: recOn ? 'var(--blue)' : 'var(--muted)' }}>
+                    🔄 Tarefa recorrente
+                  </span>
+                </div>
+
+                {recOn && (
+                  <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '1rem', border: '1.5px solid var(--blue)33' }}>
+                    {/* Frequência */}
+                    <label className="flabel" style={{ marginBottom: '.5rem', display: 'block' }}>FREQUÊNCIA</label>
+                    <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1rem' }}>
+                      {[{ v: 'daily', l: '📆 Diária' }, { v: 'weekly', l: '📅 Semanal' }, { v: 'monthly', l: '🗓 Mensal' }].map(opt => (
+                        <button key={opt.v} type="button" onClick={() => setRecFreq(opt.v)} style={{
+                          flex: 1, padding: '.5rem', borderRadius: 8, border: '1.5px solid',
+                          borderColor: recFreq === opt.v ? 'var(--blue)' : 'var(--border)',
+                          background: recFreq === opt.v ? '#3B82F615' : 'var(--card)',
+                          color: recFreq === opt.v ? 'var(--blue)' : 'var(--muted)',
+                          fontWeight: recFreq === opt.v ? 700 : 400,
+                          cursor: 'pointer', fontSize: '.78rem', transition: 'all .15s',
+                        }}>{opt.l}</button>
+                      ))}
+                    </div>
+
+                    {/* Dia da semana */}
+                    {recFreq === 'weekly' && (
+                      <div style={{ marginBottom: '1rem' }}>
+                        <label className="flabel" style={{ marginBottom: '.45rem', display: 'block' }}>DIA DA SEMANA</label>
+                        <div style={{ display: 'flex', gap: '.3rem', flexWrap: 'wrap' }}>
+                          {REC_DOW_OPTS.map(d => (
+                            <button key={d.value} type="button" onClick={() => setRecDow(d.value)} style={{
+                              padding: '.4rem .65rem', borderRadius: 7, border: '1.5px solid',
+                              borderColor: recDow === d.value ? 'var(--blue)' : 'var(--border)',
+                              background: recDow === d.value ? '#3B82F615' : 'var(--card)',
+                              color: recDow === d.value ? 'var(--blue)' : 'var(--text)',
+                              fontWeight: recDow === d.value ? 700 : 400,
+                              cursor: 'pointer', fontSize: '.8rem', transition: 'all .15s',
+                            }}>{d.label}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Dia do mês */}
+                    {recFreq === 'monthly' && (
+                      <div style={{ marginBottom: '1rem' }}>
+                        <label className="flabel" style={{ marginBottom: '.45rem', display: 'block' }}>DIA DO MÊS (1–28)</label>
+                        <input className="finput" type="number" min={1} max={28} value={recDom}
+                          onChange={e => setRecDom(Math.min(28, Math.max(1, Number(e.target.value))))}
+                          style={{ maxWidth: 100 }} />
+                      </div>
+                    )}
+
+                    {/* Duração */}
+                    <label className="flabel" style={{ marginBottom: '.45rem', display: 'block' }}>DURAÇÃO</label>
+                    <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+                      {REC_DUR_OPTS.map(opt => (
+                        <button key={opt.value} type="button" onClick={() => setRecDur(opt.value)} style={{
+                          flex: 1, minWidth: 72, padding: '.45rem', borderRadius: 7, border: '1.5px solid',
+                          borderColor: recDur === opt.value ? 'var(--blue)' : 'var(--border)',
+                          background: recDur === opt.value ? '#3B82F615' : 'var(--card)',
+                          color: recDur === opt.value ? 'var(--blue)' : 'var(--muted)',
+                          fontWeight: recDur === opt.value ? 700 : 400,
+                          cursor: 'pointer', fontSize: '.78rem', transition: 'all .15s',
+                        }}>{opt.label}</button>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: '.65rem' }}>
+                      As tarefas serão geradas automaticamente e aparecerão na agenda.
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <div className="mfoot">

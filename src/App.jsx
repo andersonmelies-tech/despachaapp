@@ -21,6 +21,7 @@ import ServiceOrders        from './components/ServiceOrders.jsx'
 import CollaboratorPayments from './components/CollaboratorPayments.jsx'
 import RequestQueue         from './components/RequestQueue.jsx'
 import PublicRequestForm    from './components/PublicRequestForm.jsx'
+import Recurrences          from './components/Recurrences.jsx'
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'admin@despachaapp.app'
 
@@ -181,7 +182,8 @@ export default function App() {
           {tab === 'cashflow'      && <CashFlow             showToast={showToast} />}
           {tab === 'serviceorders' && <ServiceOrders        showToast={showToast} session={session} />}
           {tab === 'payments'      && <CollaboratorPayments showToast={showToast} />}
-          {tab === 'requests'      && <RequestQueue showToast={showToast} onCountChange={setPendingRequests} />}
+          {tab === 'requests'      && <RequestQueue   showToast={showToast} onCountChange={setPendingRequests} />}
+          {tab === 'recurrences'  && <Recurrences    showToast={showToast} />}
         </div>
       </div>
 
