@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS task_recurrences (
   start_date       DATE NOT NULL DEFAULT CURRENT_DATE,
   end_date         DATE,      -- NULL = sem prazo / para sempre
   active           BOOLEAN DEFAULT TRUE,
-  company_id       INTEGER REFERENCES companies(id),
+  company_id       UUID REFERENCES companies(id),
   last_generated   DATE,      -- última data para a qual tarefas foram geradas
   created_at       TIMESTAMPTZ DEFAULT NOW()
 );
