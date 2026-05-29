@@ -362,13 +362,23 @@ function SectorsPanel({ showToast }) {
 
   async function add() {
     if (!newName.trim()) return
-    const { error } = await supabase.from('sectors').insert({ name: newName.trim() })
-    if (error) { showToast('Setor já existe', 'err'); return }
+    const nome = newName.trim()
+    // Verifica duplicata localmente antes de tentar inserir
+    if (sectors.some(s => s.name.toLowerCase() === nome.toLowerCase())) {
+      showToast('Setor já existe', 'err'); return
+    }
+    const { error } = await supabase.from('sectors').insert({ name: nome })
+    if (error) {
+      if (error.code === '23505') showToast('Setor já existe', 'err')
+      else showToast('Erro: ' + error.message, 'err')
+      return
+    }
     showToast('Setor criado ✓'); setNewName(''); load()
   }
 
   async function del(id) {
-    await supabase.from('sectors').update({ active: 0 }).eq('id', id)
+    const { error } = await supabase.from('sectors').update({ active: 0 }).eq('id', id)
+    if (error) { showToast('Erro ao remover: ' + error.message, 'err'); return }
     showToast('Setor removido'); load()
   }
 
