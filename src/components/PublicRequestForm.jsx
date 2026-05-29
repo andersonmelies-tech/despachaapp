@@ -112,11 +112,38 @@ export default function PublicRequestForm() {
   // ── Formulário ───────────────────────────────────────────────────────────────
   return (
     <div style={styles.page}>
+
+      {/* Logo acima do card, sobre o gradiente */}
+      <div style={{ textAlign: 'center', marginBottom: '1rem', marginTop: '.5rem' }}>
+        <img
+          src="/logo.png"
+          alt="DespachaApp"
+          style={{
+            height: 48,
+            width: 'auto',
+            objectFit: 'contain',
+            filter: 'drop-shadow(0 2px 8px rgba(0,0,0,.35))',
+          }}
+          onError={e => { e.target.style.display = 'none' }}
+        />
+      </div>
+
       <div style={styles.card}>
 
         {/* Header */}
         <div style={styles.header}>
-          <div style={styles.headerIcon}>🔧</div>
+          <img
+            src="/icon.png"
+            alt=""
+            style={{
+              width: 52, height: 52,
+              objectFit: 'cover',
+              borderRadius: 14,
+              flexShrink: 0,
+              boxShadow: '0 2px 10px rgba(0,0,0,.3)',
+            }}
+            onError={e => { e.target.replaceWith(Object.assign(document.createElement('div'), { textContent: '🔧', style: 'font-size:2rem;background:rgba(255,255,255,.15);border-radius:12px;width:52px;height:52px;display:flex;align-items:center;justify-content:center' }) }}
+          />
           <div>
             <h1 style={styles.headerTitle}>Solicitar Serviço</h1>
             <p style={styles.headerSub}>Preencha o formulário abaixo. Nossa equipe irá atender você.</p>
@@ -226,6 +253,12 @@ export default function PublicRequestForm() {
         </form>
 
         <div style={styles.footer}>
+          <img
+            src="/logo.png"
+            alt="DespachaApp"
+            style={{ height: 22, width: 'auto', objectFit: 'contain', display: 'block', margin: '0 auto .3rem', opacity: .6 }}
+            onError={e => { e.target.style.display = 'none' }}
+          />
           Powered by <strong>DespachaApp</strong>
         </div>
       </div>
@@ -239,8 +272,9 @@ const styles = {
     minHeight: '100vh',
     background: 'linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%)',
     display: 'flex',
-    alignItems: 'flex-start',
-    justifyContent: 'center',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
     padding: '1.5rem 1rem 3rem',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
@@ -251,7 +285,6 @@ const styles = {
     maxWidth: 480,
     boxShadow: '0 20px 60px rgba(0,0,0,.25)',
     overflow: 'hidden',
-    marginTop: '1rem',
   },
   header: {
     background: 'linear-gradient(135deg, #1e3a5f, #2563eb)',
