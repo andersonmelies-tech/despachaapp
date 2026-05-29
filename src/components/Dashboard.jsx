@@ -89,7 +89,29 @@ export default function Dashboard({ showToast, onStatsLoaded }) {
     loadPendingDates()
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+
+    // ── Realtime: stats e alertas se atualizam automaticamente ───────────────
+    // Usa debounce simples: aguarda 800ms após o último evento antes de recarregar
+    let debounce = null
+    const ch = supabase.channel('rt-dashboard')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+        if (!mountedRef.current) return
+        clearTimeout(debounce)
+        debounce = setTimeout(() => {
+          if (!mountedRef.current) return
+          _dc.loaded = false   // força re-fetch silencioso
+          load()
+        }, 800)
+      })
+      .subscribe()
+
+    return () => {
+      clearTimeout(debounce)
+      supabase.removeChannel(ch)
+    }
+  }, [])
 
   const s = stats || {}
   const total = s.total || 0

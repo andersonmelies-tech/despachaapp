@@ -73,6 +73,35 @@ export default function RequestQueue({ showToast, onCountChange }) {
   useEffect(() => { load() }, [])
   useEffect(() => { if (tab === 'done') loadHistory() }, [tab])
 
+  // ── Realtime: novas solicitações entram automaticamente ──────────────────────
+  useEffect(() => {
+    const ch = supabase.channel('rt-requests')
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'tasks' },
+        ({ new: t }) => {
+          if (!mountedRef.current || t.source !== 'publico') return
+          _rqc.requests = [t, ..._rqc.requests]
+          setRequests([..._rqc.requests])
+          onCountChange?.(_rqc.requests.length)
+          showToast(`📥 Nova solicitação de ${t.requester}`)
+        }
+      )
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'tasks' },
+        ({ new: t }) => {
+          if (!mountedRef.current || t.source !== 'publico') return
+          // Remove da fila quando aprovada ou cancelada
+          if (!t.needs_approval || t.status === 'cancelada') {
+            _rqc.requests = _rqc.requests.filter(r => r.id !== t.id)
+            setRequests([..._rqc.requests])
+            onCountChange?.(_rqc.requests.length)
+          }
+        }
+      )
+      .subscribe()
+    return () => supabase.removeChannel(ch)
+  }, [])
+
   async function approve(req) {
     if (!selProv) return showToast('Selecione um prestador', 'err')
     setSaving(true)

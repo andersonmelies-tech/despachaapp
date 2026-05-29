@@ -42,7 +42,52 @@ export default function Tasks({ showToast, sideFilter, user, plan, onStatsChange
   useEffect(() => {
     mountedRef.current = true
     loadAll()
-    return () => { mountedRef.current = false }
+
+    // ── Realtime: atualização automática sem reload ────────────────────────────
+    const ch = supabase.channel('rt-tasks')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tasks' },
+        ({ new: t }) => {
+          if (!mountedRef.current) return
+          // Toast apenas para eventos externos (Telegram / formulário público)
+          if (t.source === 'publico') showToast(`📥 Nova solicitação de ${t.requester}`)
+          _cache.tasks = [t, ..._cache.tasks]
+          setTasks([..._cache.tasks])
+          onStatsChange?.()
+        }
+      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tasks' },
+        ({ new: t, old: o }) => {
+          if (!mountedRef.current) return
+          // Notificações de ações do colaborador via Telegram
+          if (t.provider_obs && t.provider_obs !== o.provider_obs)
+            showToast(`💬 ${t.assignee} comentou na tarefa #${t.id}`)
+          if (t.provider_new_date && t.provider_new_date !== o.provider_new_date)
+            showToast(`📅 ${t.assignee} propôs nova data para a tarefa #${t.id}`)
+          if (t.status !== o.status && t.status === 'em_andamento')
+            showToast(`🔧 ${t.assignee} iniciou a tarefa #${t.id}`)
+          if (t.status !== o.status && t.status === 'concluida')
+            showToast(`✅ ${t.assignee} concluiu a tarefa #${t.id}`)
+          // Atualiza lista e modal aberto
+          _cache.tasks = _cache.tasks.map(x => x.id === t.id ? t : x)
+          setTasks([..._cache.tasks])
+          setDetailTask(d => d?.id === t.id ? t : d)
+          onStatsChange?.()
+        }
+      )
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'tasks' },
+        ({ old: o }) => {
+          if (!mountedRef.current) return
+          _cache.tasks = _cache.tasks.filter(x => x.id !== o.id)
+          setTasks([..._cache.tasks])
+          onStatsChange?.()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      mountedRef.current = false
+      supabase.removeChannel(ch)
+    }
   }, [])
 
   useEffect(() => {

@@ -478,6 +478,33 @@ export default function TaskDetail({ task: initialTask, onClose, onUpdate, showT
     supabase.from('task_history').select('*').eq('task_id', task.id).order('changed_at', { ascending: false }).then(r => setHistory(r.data || []))
     supabase.from('providers').select('*').eq('active', 1).then(r => setProviders(r.data || []))
     supabase.from('sectors').select('*').eq('active', 1).order('name').then(r => setSectors(r.data || []))
+
+    // ── Realtime: atualiza o modal enquanto está aberto ──────────────────────
+    const ch = supabase.channel(`rt-task-${task.id}`)
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'tasks', filter: `id=eq.${task.id}` },
+        ({ new: updated, old: prev }) => {
+          setTask(updated)
+          onUpdate?.()
+          // Recarrega histórico se houve mudança relevante
+          if (updated.status !== prev.status || updated.provider_obs !== prev.provider_obs) {
+            supabase.from('task_history').select('*').eq('task_id', task.id)
+              .order('changed_at', { ascending: false }).then(r => setHistory(r.data || []))
+          }
+          // Toast para ações do colaborador via Telegram
+          if (updated.provider_obs && updated.provider_obs !== prev.provider_obs)
+            showToast(`💬 ${updated.assignee} adicionou uma observação`)
+          if (updated.provider_new_date && updated.provider_new_date !== prev.provider_new_date)
+            showToast(`📅 ${updated.assignee} propôs nova data`)
+          if (updated.status !== prev.status && updated.status === 'em_andamento')
+            showToast(`🔧 ${updated.assignee} iniciou a tarefa`)
+          if (updated.status !== prev.status && updated.status === 'concluida')
+            showToast(`✅ ${updated.assignee} concluiu a tarefa`)
+        }
+      )
+      .subscribe()
+
+    return () => supabase.removeChannel(ch)
   }, [task.id])
 
   async function approveNewDate() {

@@ -596,6 +596,10 @@ textarea.finput { resize: vertical; min-height: 80px; }
 .dash-refresh:hover { border-color: var(--blue); color: var(--blue2); background: var(--s3); }
 .spin { display: inline-block; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes rtpulse {
+  0%, 100% { opacity: 1;   transform: scale(1);   }
+  50%       { opacity: .4; transform: scale(1.55); }
+}
 
 /* Alert panel */
 .dash-alert {
