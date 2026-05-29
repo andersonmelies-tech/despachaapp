@@ -112,6 +112,13 @@ export default function PublicRequestForm() {
             <p style={{ fontSize: '.8rem', color: '#999', marginTop: '1rem' }}>
               Guarde este número para acompanhar seu atendimento.
             </p>
+            {/* Botão para acompanhar */}
+            <a
+              href={`/acompanhar?p=${done.protocol}${inviteCode ? '&c=' + inviteCode : ''}`}
+              style={{ ...styles.btnSubmit, display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: '1rem', fontSize: '.95rem' }}
+            >
+              🔍 Acompanhar minha solicitação
+            </a>
             <button
               style={styles.btnSecondary}
               onClick={() => { setDone(null); setF({ name: '', phone: '', location: '', description: '', locationCustom: '' }); setPhotos([]) }}
