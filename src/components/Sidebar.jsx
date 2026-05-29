@@ -56,7 +56,7 @@ export default function Sidebar({ tab, setTab, sideFilter, setSideFilter, stats,
         </div>
       </div>
 
-      {/* ── Enterprise ── */}
+      {/* ── Enterprise — oculto durante testes de produção ──
       {(plan === 'enterprise' || isSuperAdmin) && (
         <div className="sb-section">
           <div className="sb-section-label">Enterprise</div>
@@ -74,6 +74,7 @@ export default function Sidebar({ tab, setTab, sideFilter, setSideFilter, stats,
           ))}
         </div>
       )}
+      ── */}
 
       {/* ── Admin (superadmin only) ── */}
       {isSuperAdmin && (

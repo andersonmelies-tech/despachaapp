@@ -300,6 +300,7 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
                 <option value="cancelada">❌ Cancelada</option>
               </select>
             </div>
+            {/* Tipo de Serviço / Cliente — oculto durante testes de produção
             {(plan === 'pro' || plan === 'enterprise') && (
               <div className="fg full">
                 <label className="flabel">TIPO DE SERVIÇO</label>
@@ -321,10 +322,12 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
                 </div>
               </div>
             )}
+            */}
             <div className="fg full">
               <label className="flabel">OBSERVAÇÕES</label>
               <textarea className="finput" style={{ minHeight: '55px' }} placeholder="Notas adicionais…" value={f.notes} onChange={e => set('notes', e.target.value)} />
             </div>
+            {/* Campos de cliente externo — oculto durante testes de produção
             {f.task_type === 'externo' && (plan === 'pro' || plan === 'enterprise') && (
               <>
                 <div className="fg">
@@ -346,6 +349,7 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
                 )}
               </>
             )}
+            */}
             <div className="fg full">
               <label className="flabel">FOTOS / ANEXOS</label>
               <div className="photo-upload-area" onClick={() => fileRef.current.click()}>
