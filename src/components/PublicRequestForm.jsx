@@ -3,7 +3,7 @@
  * Acessado via /solicitar?c=INVITE_CODE
  * Sem autenticação — qualquer pessoa pode abrir chamado
  */
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 // Comprime imagem via canvas antes de enviar
 function compressImage(file, maxPx = 1200, quality = 0.72) {
@@ -33,7 +33,17 @@ export default function PublicRequestForm() {
   const [sending,   setSending] = useState(false)
   const [done,      setDone]    = useState(null)  // { protocol }
   const [error,     setError]   = useState('')
+  const [sectors,   setSectors] = useState([])
   const fileRef = useRef()
+
+  // Carrega setores da empresa pelo invite_code
+  useEffect(() => {
+    if (!inviteCode) return
+    fetch(`/api/public/sectors?c=${inviteCode}`)
+      .then(r => r.json())
+      .then(d => { if (d.sectors?.length) setSectors(d.sectors) })
+      .catch(() => {})
+  }, [inviteCode])
 
   function set(k, v) { setF(p => ({ ...p, [k]: v })) }
 
@@ -49,6 +59,11 @@ export default function PublicRequestForm() {
     if (!f.phone.trim())       return setError('Informe seu telefone.')
     if (!f.description.trim()) return setError('Descreva o problema.')
 
+    // Resolve o local: se selecionou "Outro", usa o campo livre
+    const locationValue = f.location === '__outro__'
+      ? (f.locationCustom?.trim() || null)
+      : (f.location?.trim() || null)
+
     setSending(true)
     try {
       const res = await fetch('/api/public/request', {
@@ -57,7 +72,7 @@ export default function PublicRequestForm() {
         body: JSON.stringify({
           name:        f.name.trim(),
           phone:       f.phone.trim(),
-          location:    f.location.trim() || null,
+          location:    locationValue,
           description: f.description.trim(),
           photos:      photos.length ? photos : null,
           invite_code: inviteCode,
@@ -99,7 +114,7 @@ export default function PublicRequestForm() {
             </p>
             <button
               style={styles.btnSecondary}
-              onClick={() => { setDone(null); setF({ name: '', phone: '', location: '', description: '' }); setPhotos([]) }}
+              onClick={() => { setDone(null); setF({ name: '', phone: '', location: '', description: '', locationCustom: '' }); setPhotos([]) }}
             >
               Nova solicitação
             </button>
@@ -114,15 +129,16 @@ export default function PublicRequestForm() {
     <div style={styles.page}>
 
       {/* Logo acima do card, sobre o gradiente */}
-      <div style={{ textAlign: 'center', marginBottom: '1rem', marginTop: '.5rem' }}>
+      <div style={{ textAlign: 'center', marginBottom: '1.5rem', marginTop: '1rem' }}>
         <img
           src="/logo.png"
           alt="DespachaApp"
           style={{
-            height: 48,
+            height: 72,
+            maxWidth: 260,
             width: 'auto',
             objectFit: 'contain',
-            filter: 'drop-shadow(0 2px 8px rgba(0,0,0,.35))',
+            filter: 'drop-shadow(0 3px 12px rgba(0,0,0,.4))',
           }}
           onError={e => { e.target.style.display = 'none' }}
         />
@@ -177,15 +193,39 @@ export default function PublicRequestForm() {
             />
           </div>
 
-          {/* Local */}
+          {/* Local / Setor */}
           <div style={styles.field}>
             <label style={styles.label}>LOCAL / SETOR</label>
-            <input
-              style={styles.input}
-              placeholder="Ex: Sala 3, Recepção, Galpão B..."
-              value={f.location}
-              onChange={e => set('location', e.target.value)}
-            />
+            {sectors.length > 0 ? (
+              <select
+                style={{ ...styles.input, cursor: 'pointer', color: f.location ? '#1a1a2e' : '#9ca3af' }}
+                value={f.location}
+                onChange={e => set('location', e.target.value)}
+              >
+                <option value="">Selecione o setor…</option>
+                {sectors.map(s => (
+                  <option key={s.id} value={s.name}>{s.name}</option>
+                ))}
+                <option value="__outro__">Outro (digitar abaixo)</option>
+              </select>
+            ) : (
+              <input
+                style={styles.input}
+                placeholder="Ex: Sala 3, Recepção, Galpão B..."
+                value={f.location}
+                onChange={e => set('location', e.target.value)}
+              />
+            )}
+            {/* Campo livre quando "Outro" selecionado */}
+            {f.location === '__outro__' && (
+              <input
+                style={{ ...styles.input, marginTop: '.5rem' }}
+                placeholder="Descreva o local..."
+                value={f.locationCustom || ''}
+                onChange={e => setF(p => ({ ...p, locationCustom: e.target.value }))}
+                autoFocus
+              />
+            )}
           </div>
 
           {/* Descrição */}
