@@ -1,27 +1,28 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { supabase } from './lib/supabase.js'
 import Login       from './components/Login.jsx'
 import LandingPage from './components/LandingPage.jsx'
 import Topbar      from './components/Topbar.jsx'
 import Sidebar     from './components/Sidebar.jsx'
-import Dashboard   from './components/Dashboard.jsx'
-import Tasks       from './components/Tasks.jsx'
-import Calendar    from './components/Calendar.jsx'
-import Reports     from './components/Reports.jsx'
-import Settings    from './components/Settings.jsx'
-import AdminPanel  from './components/AdminPanel.jsx'
 import Toast       from './components/Toast.jsx'
 import MobileNav   from './components/MobileNav.jsx'
-import Pricing     from './components/Pricing.jsx'
 import TrialBanner from './components/TrialBanner.jsx'
-import Clients              from './components/Clients.jsx'
-import Budgets              from './components/Budgets.jsx'
-import CashFlow             from './components/CashFlow.jsx'
-import ServiceOrders        from './components/ServiceOrders.jsx'
-import CollaboratorPayments from './components/CollaboratorPayments.jsx'
-import RequestQueue         from './components/RequestQueue.jsx'
-import PublicRequestForm    from './components/PublicRequestForm.jsx'
-import Recurrences          from './components/Recurrences.jsx'
+
+// Carregamento diferido — cada aba só carrega quando o usuário acessa
+const Dashboard   = lazy(() => import('./components/Dashboard.jsx'))
+const Tasks       = lazy(() => import('./components/Tasks.jsx'))
+const Calendar    = lazy(() => import('./components/Calendar.jsx'))
+const Reports     = lazy(() => import('./components/Reports.jsx'))
+const Settings    = lazy(() => import('./components/Settings.jsx'))
+const AdminPanel  = lazy(() => import('./components/AdminPanel.jsx'))
+const Pricing     = lazy(() => import('./components/Pricing.jsx'))
+const Recurrences = lazy(() => import('./components/Recurrences.jsx'))
+const RequestQueue         = lazy(() => import('./components/RequestQueue.jsx'))
+const Clients              = lazy(() => import('./components/Clients.jsx'))
+const Budgets              = lazy(() => import('./components/Budgets.jsx'))
+const CashFlow             = lazy(() => import('./components/CashFlow.jsx'))
+const ServiceOrders        = lazy(() => import('./components/ServiceOrders.jsx'))
+const CollaboratorPayments = lazy(() => import('./components/CollaboratorPayments.jsx'))
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'admin@despachaapp.app'
 
@@ -171,19 +172,21 @@ export default function App() {
           plan={plan}      pendingRequests={pendingRequests}
         />
         <div className="main">
-          {tab === 'dashboard' && <Dashboard key={statsKey} showToast={showToast} onStatsLoaded={setStats} />}
-          {tab === 'tasks'     && <Tasks showToast={showToast} sideFilter={sideFilter} user={meta} plan={plan} onStatsChange={() => setStatsKey(k => k + 1)} />}
-          {tab === 'calendar'  && <Calendar showToast={showToast} />}
-          {tab === 'reports'   && <Reports  showToast={showToast} />}
-          {tab === 'settings'  && <Settings showToast={showToast} user={meta} session={session} />}
-          {tab === 'admin'     && isSuperAdmin && <AdminPanel session={session} />}
-          {tab === 'clients'       && <Clients              showToast={showToast} />}
-          {tab === 'budgets'       && <Budgets              showToast={showToast} />}
-          {tab === 'cashflow'      && <CashFlow             showToast={showToast} />}
-          {tab === 'serviceorders' && <ServiceOrders        showToast={showToast} session={session} />}
-          {tab === 'payments'      && <CollaboratorPayments showToast={showToast} />}
-          {tab === 'requests'      && <RequestQueue   showToast={showToast} onCountChange={setPendingRequests} />}
-          {tab === 'recurrences'  && <Recurrences    showToast={showToast} />}
+          <Suspense fallback={<div className="empty" style={{ padding: '3rem', textAlign: 'center' }}>Carregando…</div>}>
+            {tab === 'dashboard' && <Dashboard key={statsKey} showToast={showToast} onStatsLoaded={setStats} />}
+            {tab === 'tasks'     && <Tasks showToast={showToast} sideFilter={sideFilter} user={meta} plan={plan} onStatsChange={() => setStatsKey(k => k + 1)} />}
+            {tab === 'calendar'  && <Calendar showToast={showToast} />}
+            {tab === 'reports'   && <Reports  showToast={showToast} />}
+            {tab === 'settings'  && <Settings showToast={showToast} user={meta} session={session} />}
+            {tab === 'admin'     && isSuperAdmin && <AdminPanel session={session} />}
+            {tab === 'clients'       && <Clients              showToast={showToast} />}
+            {tab === 'budgets'       && <Budgets              showToast={showToast} />}
+            {tab === 'cashflow'      && <CashFlow             showToast={showToast} />}
+            {tab === 'serviceorders' && <ServiceOrders        showToast={showToast} session={session} />}
+            {tab === 'payments'      && <CollaboratorPayments showToast={showToast} />}
+            {tab === 'requests'      && <RequestQueue   showToast={showToast} onCountChange={setPendingRequests} />}
+            {tab === 'recurrences'  && <Recurrences    showToast={showToast} />}
+          </Suspense>
         </div>
       </div>
 

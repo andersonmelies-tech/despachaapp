@@ -3,4 +3,18 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Separa dependências pesadas em chunks próprios
+          'vendor-react':    ['react', 'react-dom'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+          'vendor-pdf':      ['jspdf', 'jspdf-autotable'],
+        },
+      },
+    },
+    // Aumenta o limite de aviso para 600kB
+    chunkSizeWarningLimit: 600,
+  },
 })
