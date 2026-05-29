@@ -479,9 +479,13 @@ export default function TaskDetail({ task: initialTask, onClose, onUpdate, showT
   const [sectors, setSectors] = useState([])
 
   useEffect(() => {
-    supabase.from('task_history').select('*').eq('task_id', task.id).order('changed_at', { ascending: false }).then(r => setHistory(r.data || []))
-    supabase.from('providers').select('*').eq('active', 1).then(r => setProviders(r.data || []))
-    supabase.from('sectors').select('*').eq('active', 1).order('name').then(r => setSectors(r.data || []))
+    // Busca completa da tarefa (inclui photos/description/notes que a lista omite)
+    supabase.from('tasks').select('*').eq('id', initialTask.id).single()
+      .then(({ data }) => { if (data) setTask(data) })
+
+    supabase.from('task_history').select('*').eq('task_id', initialTask.id).order('changed_at', { ascending: false }).then(r => setHistory(r.data || []))
+    supabase.from('providers').select('id,name,chat_id,active').eq('active', 1).then(r => setProviders(r.data || []))
+    supabase.from('sectors').select('id,name,active').eq('active', 1).order('name').then(r => setSectors(r.data || []))
 
     // ── Realtime: atualiza o modal enquanto está aberto ──────────────────────
     const ch = supabase.channel(`rt-task-${task.id}`)

@@ -48,11 +48,25 @@ export function isOverdue(task) {
 }
 
 // ── Stat query ────────────────────────────────────────────────────────────────
-export async function fetchStats() {
-  const now = new Date().toISOString()
-  const today = new Date().toISOString().split('T')[0]
+// Seleciona APENAS as colunas necessárias para o cálculo — evita baixar
+// photos (base64), description, requester_phone, etc.
+const STATS_COLS = 'id,status,urgency,due_date,sla_deadline,elapsed_minutes,assignee_id,sector'
+const STATS_CACHE_KEY = 'dsp_stats_cache'
 
-  const { data: tasks } = await supabase.from('tasks').select('*')
+// Lê cache do sessionStorage (dura enquanto a aba está aberta)
+export function getStatsCache() {
+  try { return JSON.parse(sessionStorage.getItem(STATS_CACHE_KEY)) } catch { return null }
+}
+function setStatsCache(data) {
+  try { sessionStorage.setItem(STATS_CACHE_KEY, JSON.stringify(data)) } catch {}
+}
+
+export async function fetchStats() {
+  // Queries em paralelo — tasks + providers ao mesmo tempo
+  const [{ data: tasks }, { data: provs }] = await Promise.all([
+    supabase.from('tasks').select(STATS_COLS),
+    supabase.from('providers').select('id,name,chat_id').eq('active', 1),
+  ])
   if (!tasks) return null
 
   const total      = tasks.length
@@ -69,7 +83,6 @@ export async function fetchStats() {
     : 0
 
   // Por prestador
-  const { data: provs } = await supabase.from('providers').select('*').eq('active', 1)
   const por_prestador = (provs || []).map(p => {
     const pt = tasks.filter(t => t.assignee_id === p.id)
     const pf = pt.filter(t => t.elapsed_minutes)
@@ -95,5 +108,7 @@ export async function fetchStats() {
   })
   const por_setor = Object.values(setorMap).sort((a,b) => b.total - a.total)
 
-  return { total, pendente, em_andamento: em_and, concluida, cancelada, atrasadas, criticas, avg_minutes, por_prestador, por_setor }
+  const result = { total, pendente, em_andamento: em_and, concluida, cancelada, atrasadas, criticas, avg_minutes, por_prestador, por_setor }
+  setStatsCache(result)   // salva para próxima abertura da aba
+  return result
 }

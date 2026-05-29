@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { fetchStats, supabase } from '../lib/supabase.js'
-import { cacheGet, cacheSet } from '../lib/cache.js'
+import { fetchStats, getStatsCache, supabase } from '../lib/supabase.js'
 
+// Cache em memória (persiste enquanto componente está montado)
 const _dc = { stats: null, dates: [], loaded: false }
 
 function fmtMin(m) {
@@ -41,8 +41,10 @@ const CARD_CFG = [
 ]
 
 export default function Dashboard({ showToast, onStatsLoaded }) {
-  const [stats,        setStats]        = useState(_dc.stats)
-  const [loading,      setLoading]      = useState(!_dc.loaded)
+  // Mostra cache do sessionStorage imediatamente (evita tela em branco)
+  const cached = _dc.stats || getStatsCache()
+  const [stats,        setStats]        = useState(cached)
+  const [loading,      setLoading]      = useState(!cached)
   const [pendingDates, setPendingDates] = useState(_dc.dates)
   const mountedRef = useRef(true)
 
