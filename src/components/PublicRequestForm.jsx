@@ -300,13 +300,15 @@ export default function PublicRequestForm() {
         </form>
 
         <div style={styles.footer}>
-          <img
-            src="/logo.png"
-            alt="DespachaApp"
-            style={{ height: 22, width: 'auto', objectFit: 'contain', display: 'block', margin: '0 auto .3rem', opacity: .6 }}
-            onError={e => { e.target.style.display = 'none' }}
-          />
-          Powered by <strong>DespachaApp</strong>
+          <a
+            href={`/acompanhar${inviteCode ? '?c=' + inviteCode : ''}`}
+            style={{ display: 'inline-block', marginBottom: '.6rem', fontSize: '.82rem', color: '#2563eb', fontWeight: 600, textDecoration: 'none', background: '#eff6ff', padding: '.35rem .9rem', borderRadius: 6 }}
+          >
+            🔍 Já enviou? Acompanhe sua solicitação
+          </a>
+          <div>
+            Powered by <strong>DespachaApp</strong>
+          </div>
         </div>
       </div>
     </div>
