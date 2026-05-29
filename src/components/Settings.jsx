@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase, toEmail } from '../lib/supabase.js'
+import { supabase, toEmail, getCompanyId } from '../lib/supabase.js'
 import ApiDocs from './ApiDocs.jsx'
 
 // Username do bot centralizado (configure VITE_BOT_USERNAME no Vercel)
@@ -363,11 +363,11 @@ function SectorsPanel({ showToast }) {
   async function add() {
     if (!newName.trim()) return
     const nome = newName.trim()
-    // Verifica duplicata localmente antes de tentar inserir
     if (sectors.some(s => s.name.toLowerCase() === nome.toLowerCase())) {
       showToast('Setor já existe', 'err'); return
     }
-    const { error } = await supabase.from('sectors').insert({ name: nome })
+    const company_id = await getCompanyId()
+    const { error } = await supabase.from('sectors').insert({ name: nome, company_id })
     if (error) {
       if (error.code === '23505') showToast('Setor já existe', 'err')
       else showToast('Erro: ' + error.message, 'err')
