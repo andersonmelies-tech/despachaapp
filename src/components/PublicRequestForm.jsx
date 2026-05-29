@@ -142,7 +142,7 @@ export default function PublicRequestForm() {
               flexShrink: 0,
               boxShadow: '0 2px 10px rgba(0,0,0,.3)',
             }}
-            onError={e => { e.target.replaceWith(Object.assign(document.createElement('div'), { textContent: '🔧', style: 'font-size:2rem;background:rgba(255,255,255,.15);border-radius:12px;width:52px;height:52px;display:flex;align-items:center;justify-content:center' }) }}
+            onError={e => { e.target.style.display = 'none' }}
           />
           <div>
             <h1 style={styles.headerTitle}>Solicitar Serviço</h1>
