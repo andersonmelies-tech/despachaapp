@@ -129,16 +129,16 @@ export default function PublicRequestForm() {
     <div style={styles.page}>
 
       {/* Logo acima do card, sobre o gradiente */}
-      <div style={{ textAlign: 'center', marginBottom: '1.5rem', marginTop: '1rem' }}>
+      <div style={{ width: '100%', maxWidth: 480, marginBottom: '1.25rem', marginTop: '1rem', textAlign: 'center' }}>
         <img
           src="/logo.png"
           alt="DespachaApp"
           style={{
-            height: 72,
-            maxWidth: 260,
-            width: 'auto',
+            width: '100%',
+            maxWidth: 480,
+            height: 'auto',
             objectFit: 'contain',
-            filter: 'drop-shadow(0 3px 12px rgba(0,0,0,.4))',
+            filter: 'drop-shadow(0 3px 14px rgba(0,0,0,.45))',
           }}
           onError={e => { e.target.style.display = 'none' }}
         />
