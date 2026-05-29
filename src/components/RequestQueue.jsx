@@ -244,13 +244,14 @@ export default function RequestQueue({ showToast, onCountChange }) {
     load()
   }
 
-  // ── Link público ──────────────────────────────────────────────────────────
-  const publicUrl = `${window.location.origin}/solicitar${inviteCode ? `?c=${inviteCode}` : ''}`
-  const qrUrl     = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(publicUrl)}`
+  // ── Links públicos ─────────────────────────────────────────────────────────
+  const publicUrl  = `${window.location.origin}/solicitar${inviteCode ? `?c=${inviteCode}` : ''}`
+  const trackUrl   = `${window.location.origin}/acompanhar${inviteCode ? `?c=${inviteCode}` : ''}`
+  const qrUrl      = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(publicUrl)}`
+  const qrTrackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(trackUrl)}`
 
-  function copyLink() {
-    navigator.clipboard.writeText(publicUrl).then(() => showToast('Link copiado! ✓'))
-  }
+  function copyLink()      { navigator.clipboard.writeText(publicUrl).then(() => showToast('Link de solicitação copiado! ✓')) }
+  function copyTrackLink() { navigator.clipboard.writeText(trackUrl).then(() => showToast('Link de acompanhamento copiado! ✓')) }
 
   // ── Fotos ─────────────────────────────────────────────────────────────────
   function getPhotos(task) {
@@ -277,45 +278,66 @@ export default function RequestQueue({ showToast, onCountChange }) {
 
       {/* Link público + QR */}
       <div className="cfg-card" style={{ marginBottom:'1.25rem', padding:'1.25rem' }}>
-        <div style={{ fontSize:'.75rem', color:'var(--muted)', fontFamily:'var(--mono)', letterSpacing:'.08em', marginBottom:'.75rem' }}>
-          🔗 LINK PARA CLIENTES
+        <div style={{ fontSize:'.75rem', color:'var(--muted)', fontFamily:'var(--mono)', letterSpacing:'.08em', marginBottom:'1rem' }}>
+          🔗 LINKS PARA CLIENTES
         </div>
-        <div style={{ display:'flex', gap:'2rem', alignItems:'flex-start', flexWrap:'wrap' }}>
-          <div style={{ flex:1, minWidth:240 }}>
-            <p style={{ fontSize:'.82rem', color:'var(--muted)', marginBottom:'.75rem', lineHeight:1.5 }}>
-              Compartilhe este link ou QR Code com seus clientes. Eles preenchem o formulário sem precisar de cadastro.
+
+        {/* Grade: solicitação + acompanhamento lado a lado */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem', marginBottom:'1.25rem' }}>
+
+          {/* Solicitação */}
+          <div style={{ background:'var(--bg)', borderRadius:10, padding:'1rem', border:'1px solid var(--border)' }}>
+            <div style={{ fontSize:'.72rem', fontWeight:700, color:'var(--blue)', letterSpacing:'.07em', marginBottom:'.6rem' }}>
+              📤 ABRIR SOLICITAÇÃO
+            </div>
+            <p style={{ fontSize:'.78rem', color:'var(--muted)', marginBottom:'.6rem', lineHeight:1.45 }}>
+              Enviar para quem vai <strong>abrir</strong> um chamado.
             </p>
-            <div style={{ display:'flex', gap:'.5rem', marginBottom:'.5rem' }}>
-              <input
-                className="finput"
-                readOnly
-                value={publicUrl}
-                style={{ flex:1, fontSize:'.78rem', fontFamily:'var(--mono)', background:'var(--bg)' }}
-              />
-              <button className="btn-primary" onClick={copyLink} style={{ whiteSpace:'nowrap' }}>
-                📋 Copiar
+            <div style={{ display:'flex', gap:'.4rem', marginBottom:'.4rem' }}>
+              <input className="finput" readOnly value={publicUrl}
+                style={{ flex:1, fontSize:'.72rem', fontFamily:'var(--mono)', background:'var(--card)' }} />
+              <button className="btn-primary" onClick={copyLink} style={{ whiteSpace:'nowrap', fontSize:'.78rem', padding:'.4rem .7rem' }}>
+                📋
               </button>
             </div>
-            <a
-              href={publicUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ fontSize:'.78rem', color:'var(--blue)', textDecoration:'none' }}
-            >
-              ↗ Abrir formulário
-            </a>
+            <div style={{ display:'flex', gap:'1rem', alignItems:'center' }}>
+              <a href={publicUrl} target="_blank" rel="noopener noreferrer"
+                style={{ fontSize:'.75rem', color:'var(--blue)', textDecoration:'none' }}>↗ Abrir</a>
+              <div style={{ textAlign:'center' }}>
+                <img src={qrUrl} alt="QR" style={{ width:80, height:80, borderRadius:6, border:'1px solid var(--border)', display:'block' }} />
+                <a href={qrUrl} download="qr-solicitar.png"
+                  style={{ fontSize:'.65rem', color:'var(--muted)', textDecoration:'none' }}>⬇ QR</a>
+              </div>
+            </div>
           </div>
-          <div style={{ textAlign:'center' }}>
-            <img src={qrUrl} alt="QR Code" style={{ width:140, height:140, borderRadius:8, border:'1px solid var(--border)' }} />
-            <div style={{ fontSize:'.7rem', color:'var(--muted)', marginTop:'.4rem' }}>QR Code</div>
-            <a
-              href={qrUrl}
-              download="qrcode-solicitacao.png"
-              style={{ fontSize:'.72rem', color:'var(--blue)', textDecoration:'none' }}
-            >
-              ⬇ Baixar QR
-            </a>
+
+          {/* Acompanhamento */}
+          <div style={{ background:'var(--bg)', borderRadius:10, padding:'1rem', border:'1px solid var(--border)' }}>
+            <div style={{ fontSize:'.72rem', fontWeight:700, color:'var(--green)', letterSpacing:'.07em', marginBottom:'.6rem' }}>
+              🔍 ACOMPANHAR PROTOCOLO
+            </div>
+            <p style={{ fontSize:'.78rem', color:'var(--muted)', marginBottom:'.6rem', lineHeight:1.45 }}>
+              Enviar para quem quer <strong>consultar</strong> o status.
+            </p>
+            <div style={{ display:'flex', gap:'.4rem', marginBottom:'.4rem' }}>
+              <input className="finput" readOnly value={trackUrl}
+                style={{ flex:1, fontSize:'.72rem', fontFamily:'var(--mono)', background:'var(--card)' }} />
+              <button className="btn-primary" onClick={copyTrackLink}
+                style={{ whiteSpace:'nowrap', fontSize:'.78rem', padding:'.4rem .7rem', background:'var(--green)' }}>
+                📋
+              </button>
+            </div>
+            <div style={{ display:'flex', gap:'1rem', alignItems:'center' }}>
+              <a href={trackUrl} target="_blank" rel="noopener noreferrer"
+                style={{ fontSize:'.75rem', color:'var(--green)', textDecoration:'none' }}>↗ Abrir</a>
+              <div style={{ textAlign:'center' }}>
+                <img src={qrTrackUrl} alt="QR" style={{ width:80, height:80, borderRadius:6, border:'1px solid var(--border)', display:'block' }} />
+                <a href={qrTrackUrl} download="qr-acompanhar.png"
+                  style={{ fontSize:'.65rem', color:'var(--muted)', textDecoration:'none' }}>⬇ QR</a>
+              </div>
+            </div>
           </div>
+
         </div>
       </div>
 
