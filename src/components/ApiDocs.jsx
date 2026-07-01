@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase.js'
+import { supabase, getCompanyId } from '../lib/supabase.js'
 
 const BASE_URL = 'https://despachaapp.vercel.app/api/v1'
 
@@ -118,27 +118,32 @@ function MethodBadge({ method }) {
 
 export default function ApiDocs({ showToast }) {
   const [apiKey,      setApiKey]      = useState('')
-  const [companyId,   setCompanyId]   = useState(null)
   const [loading,     setLoading]     = useState(true)
   const [regen,       setRegen]       = useState(false)
   const [showKey,     setShowKey]     = useState(false)
   const [expanded,    setExpanded]    = useState(null)
 
   useEffect(() => {
-    supabase.from('companies').select('id, api_key').limit(1).single()
-      .then(({ data }) => {
-        if (data) { setApiKey(data.api_key || ''); setCompanyId(data.id) }
-        setLoading(false)
-      })
+    (async () => {
+      const id = await getCompanyId()
+      if (!id) { setLoading(false); return }
+      const { data } = await supabase.from('companies').select('id, api_key').eq('id', id).single()
+      if (data) setApiKey(data.api_key || '')
+      setLoading(false)
+    })()
   }, [])
 
   async function regenerate() {
     if (!confirm('Regenerar a chave de API? A chave atual deixará de funcionar imediatamente.')) return
     setRegen(true)
-    const newKey = crypto.randomUUID().replace(/-/g, '')
-    const { error } = await supabase.from('companies').update({ api_key: newKey }).eq('id', companyId)
-    if (error) { showToast('Erro ao regenerar: ' + error.message, 'err') }
-    else { setApiKey(newKey); showToast('Chave regenerada com sucesso ✓') }
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/company/regenerate-key', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) { showToast('Erro ao regenerar: ' + (body.error || res.statusText), 'err') }
+    else { setApiKey(body.api_key); showToast('Chave regenerada com sucesso ✓') }
     setRegen(false)
   }
 
