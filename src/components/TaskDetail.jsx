@@ -195,6 +195,10 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
         payload.completed_at = now.toISOString()
         if (task.started_at) payload.elapsed_minutes = Math.round((now - new Date(task.started_at)) / 60000)
       }
+      // Re-notifica o bot quando o colaborador é trocado ou atribuído pela primeira vez
+      if (f.assignee_id && String(f.assignee_id) !== String(task.assignee_id || '')) {
+        payload.provider_notified = false
+      }
     }
 
     // Garante company_id no INSERT (não precisa no UPDATE pois a linha já existe)

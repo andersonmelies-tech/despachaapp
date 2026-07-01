@@ -59,6 +59,10 @@ export default async function handler(request) {
     if (updates.status === 'em_andamento' && !updates.started_at) {
       updates.started_at = new Date().toISOString()
     }
+    // Re-notifica o bot quando assignee_id é definido/trocado via API
+    if (updates.assignee_id) {
+      updates.provider_notified = false
+    }
 
     const { data, error } = await supabase
       .from('tasks')
