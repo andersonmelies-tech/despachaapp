@@ -2,30 +2,40 @@ export const config = { runtime: 'edge' }
 
 import { createClient } from '@supabase/supabase-js'
 
+async function resolveCompanyId(supabase, user) {
+  const companyId = user.user_metadata?.company_id
+  if (companyId) return companyId
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle()
+  return co?.id
+}
+
+async function verifyUser(supabase, req) {
+  const authHeader = req.headers.get('authorization')
+  if (!authHeader) return null
+  const token = authHeader.replace('Bearer ', '')
+  const { data: { user }, error } = await supabase.auth.getUser(token)
+  if (error || !user) return null
+  return user
+}
+
 export default async function handler(req) {
   const supabaseUrl        = process.env.SUPABASE_URL
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY
+  const supabase           = createClient(supabaseUrl, supabaseServiceKey)
 
-  // GET — return current branding config for the authenticated user's company
+  // GET — retorna configurações de branding da empresa (bypassa RLS via service key)
   if (req.method === 'GET') {
-    const authHeader = req.headers.get('authorization')
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Missing authorization' }), { status: 401 })
-    }
-    const token = authHeader.replace('Bearer ', '')
+    const user = await verifyUser(supabase, req)
+    if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    // Verify user JWT
-    const { data: { user }, error: authErr } = await supabase.auth.getUser(token)
-    if (authErr || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
-    }
+    const companyId = await resolveCompanyId(supabase, user)
+    if (!companyId) return new Response(JSON.stringify({ error: 'company_id not found' }), { status: 400 })
 
     const { data: cfgRows } = await supabase
       .from('config')
       .select('key, value')
-      .in('key', ['brand_logo_url', 'brand_primary_color'])
+      .eq('company_id', companyId)
+      .in('key', ['brand_logo_url', 'brand_primary_color', 'report_email'])
 
     const cfg = {}
     if (cfgRows) cfgRows.forEach(r => { cfg[r.key] = r.value })
@@ -36,33 +46,14 @@ export default async function handler(req) {
     })
   }
 
-  // POST — upload logo
+  // POST — upload de logo
   if (req.method === 'POST') {
-    const authHeader = req.headers.get('authorization')
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Missing authorization' }), { status: 401 })
-    }
-    const token = authHeader.replace('Bearer ', '')
+    const user = await verifyUser(supabase, req)
+    if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const companyId = await resolveCompanyId(supabase, user)
+    if (!companyId) return new Response(JSON.stringify({ error: 'company_id not found' }), { status: 400 })
 
-    // Verify user JWT and get company_id
-    const { data: { user }, error: authErr } = await supabase.auth.getUser(token)
-    if (authErr || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
-    }
-
-    // Resolve company_id — super admin não tem no metadata, busca da tabela
-    let companyId = user.user_metadata?.company_id
-    if (!companyId) {
-      const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle()
-      companyId = co?.id
-    }
-    if (!companyId) {
-      return new Response(JSON.stringify({ error: 'company_id not found' }), { status: 400 })
-    }
-
-    // Parse multipart form data
     let file
     try {
       const formData = await req.formData()
@@ -79,40 +70,19 @@ export default async function handler(req) {
     const contentType = file.type || 'image/png'
     const storagePath = `${companyId}/logo`
 
-    // Upload to Supabase Storage bucket 'branding'
     const { error: uploadErr } = await supabase.storage
       .from('branding')
-      .upload(storagePath, fileBuffer, {
-        contentType,
-        upsert: true,
-      })
+      .upload(storagePath, fileBuffer, { contentType, upsert: true })
 
     if (uploadErr) {
       return new Response(JSON.stringify({ error: uploadErr.message }), { status: 500 })
     }
 
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from('branding')
-      .getPublicUrl(storagePath)
-
+    const { data: urlData } = supabase.storage.from('branding').getPublicUrl(storagePath)
     const publicUrl = urlData?.publicUrl
-    if (!publicUrl) {
-      return new Response(JSON.stringify({ error: 'Could not get public URL' }), { status: 500 })
-    }
+    if (!publicUrl) return new Response(JSON.stringify({ error: 'Could not get public URL' }), { status: 500 })
 
-    // Upsert brand_logo_url in config table (constraint única: key + company_id)
-    const { error: cfgErr } = await supabase
-      .from('config')
-      .upsert(
-        { key: 'brand_logo_url', value: publicUrl, company_id: companyId },
-        { onConflict: 'key,company_id' },
-      )
-
-    if (cfgErr) {
-      // Non-fatal: return URL anyway
-      console.error('Config upsert error:', cfgErr.message)
-    }
+    await upsertConfig(supabase, 'brand_logo_url', publicUrl, companyId)
 
     return new Response(JSON.stringify({ url: publicUrl }), {
       status: 200,
@@ -120,5 +90,43 @@ export default async function handler(req) {
     })
   }
 
+  // PUT — salva cor principal e email (bypassa RLS via service key)
+  if (req.method === 'PUT') {
+    const user = await verifyUser(supabase, req)
+    if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+
+    const companyId = await resolveCompanyId(supabase, user)
+    if (!companyId) return new Response(JSON.stringify({ error: 'company_id not found' }), { status: 400 })
+
+    let body
+    try { body = await req.json() } catch { body = {} }
+
+    const ops = []
+    if (body.brand_primary_color !== undefined) ops.push(upsertConfig(supabase, 'brand_primary_color', body.brand_primary_color, companyId))
+    if (body.report_email        !== undefined) ops.push(upsertConfig(supabase, 'report_email',        body.report_email,        companyId))
+    await Promise.all(ops)
+
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
   return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 })
+}
+
+async function upsertConfig(supabase, key, value, companyId) {
+  // Tenta UPDATE primeiro; se não existe, INSERT
+  const { data: existing } = await supabase
+    .from('config')
+    .select('key')
+    .eq('key', key)
+    .eq('company_id', companyId)
+    .maybeSingle()
+
+  if (existing) {
+    return supabase.from('config').update({ value }).eq('key', key).eq('company_id', companyId)
+  } else {
+    return supabase.from('config').insert({ key, value, company_id: companyId })
+  }
 }

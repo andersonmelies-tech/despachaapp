@@ -590,21 +590,15 @@ function BrandingPanel({ showToast, session }) {
   const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
-    supabase.from('config').select('*').then(r => {
-      const c = {}; (r.data || []).forEach(x => { c[x.key] = x.value })
+    if (!session?.access_token) return
+    fetch('/api/branding/upload', {
+      headers: { Authorization: `Bearer ${session.access_token}` }
+    }).then(r => r.json()).then(c => {
       if (c.brand_logo_url)      setLogoUrl(c.brand_logo_url)
       if (c.brand_primary_color) setColor(c.brand_primary_color)
       if (c.report_email)        setEmail(c.report_email)
-    })
-  }, [])
-
-  async function getCompanyId() {
-    const companyId = session?.user?.user_metadata?.company_id
-    if (companyId) return companyId
-    // super admin: busca da tabela
-    const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle()
-    return co?.id
-  }
+    }).catch(() => {})
+  }, [session])
 
   async function uploadLogo(e) {
     const file = e.target.files[0]; if (!file) return
@@ -621,18 +615,13 @@ function BrandingPanel({ showToast, session }) {
 
   async function saveSettings() {
     setSaving(true)
-    const companyId = await getCompanyId()
-    await Promise.all([
-      supabase.from('config').upsert(
-        { key: 'brand_primary_color', value: color, company_id: companyId },
-        { onConflict: 'key,company_id' }
-      ),
-      supabase.from('config').upsert(
-        { key: 'report_email', value: email, company_id: companyId },
-        { onConflict: 'key,company_id' }
-      ),
-    ])
-    // Apply color immediately
+    const res = await fetch('/api/branding/upload', {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brand_primary_color: color, report_email: email }),
+    })
+    const d = await res.json()
+    if (!d.ok) { showToast('Erro ao salvar', 'err'); setSaving(false); return }
     document.documentElement.style.setProperty('--blue', color)
     showToast('Configurações salvas ✓')
     setSaving(false)
