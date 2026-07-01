@@ -582,7 +582,7 @@ function UsersPanel({ showToast, user: currentUser, session }) {
 }
 
 // ── Branding ───────────────────────────────────────────────────────────────
-function BrandingPanel({ showToast }) {
+function BrandingPanel({ showToast, session }) {
   const [logoUrl,   setLogoUrl]   = useState('')
   const [color,     setColor]     = useState('#3B82F6')
   const [email,     setEmail]     = useState('')
@@ -598,25 +598,39 @@ function BrandingPanel({ showToast }) {
     })
   }, [])
 
+  async function getCompanyId() {
+    const companyId = session?.user?.user_metadata?.company_id
+    if (companyId) return companyId
+    // super admin: busca da tabela
+    const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle()
+    return co?.id
+  }
+
   async function uploadLogo(e) {
     const file = e.target.files[0]; if (!file) return
     setUploading(true)
-    const { data: { session } } = await supabase.auth.getSession()
     const form = new FormData(); form.append('file', file)
     const res = await fetch('/api/branding/upload', {
       method: 'POST', headers: { Authorization: `Bearer ${session?.access_token}` }, body: form
     })
     const d = await res.json()
     if (d.url) { setLogoUrl(d.url); showToast('Logo atualizada ✓') }
-    else showToast('Erro ao fazer upload', 'err')
+    else showToast('Erro ao fazer upload: ' + (d.error || 'desconhecido'), 'err')
     setUploading(false)
   }
 
   async function saveSettings() {
     setSaving(true)
+    const companyId = await getCompanyId()
     await Promise.all([
-      supabase.from('config').upsert({ key: 'brand_primary_color', value: color }),
-      supabase.from('config').upsert({ key: 'report_email', value: email }),
+      supabase.from('config').upsert(
+        { key: 'brand_primary_color', value: color, company_id: companyId },
+        { onConflict: 'key,company_id' }
+      ),
+      supabase.from('config').upsert(
+        { key: 'report_email', value: email, company_id: companyId },
+        { onConflict: 'key,company_id' }
+      ),
     ])
     // Apply color immediately
     document.documentElement.style.setProperty('--blue', color)
@@ -781,7 +795,7 @@ export default function Settings({ showToast, user, session }) {
       {tab === 'sectors'   && <SectorsPanel    showToast={showToast} />}
       {tab === 'users'     && <UsersPanel      showToast={showToast} user={user} session={session} />}
       {tab === 'api'       && <ApiDocs         showToast={showToast} />}
-      {tab === 'branding'  && <BrandingPanel   showToast={showToast} />}
+      {tab === 'branding'  && <BrandingPanel   showToast={showToast} session={session} />}
       {tab === 'fiscal'    && <FiscalPanel     showToast={showToast} />}
     </div>
   )

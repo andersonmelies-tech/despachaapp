@@ -101,12 +101,12 @@ export default async function handler(req) {
       return new Response(JSON.stringify({ error: 'Could not get public URL' }), { status: 500 })
     }
 
-    // Upsert brand_logo_url in config table (usa só 'key' como conflito)
+    // Upsert brand_logo_url in config table (constraint única: key + company_id)
     const { error: cfgErr } = await supabase
       .from('config')
       .upsert(
-        { key: 'brand_logo_url', value: publicUrl },
-        { onConflict: 'key' },
+        { key: 'brand_logo_url', value: publicUrl, company_id: companyId },
+        { onConflict: 'key,company_id' },
       )
 
     if (cfgErr) {
