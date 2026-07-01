@@ -2,7 +2,7 @@ import { authenticate, ok, err, CORS_HEADERS } from './_auth.js'
 
 export const config = { runtime: 'edge' }
 
-const ALLOWED_PATCH_FIELDS = ['status', 'urgency', 'assignee_id', 'due_date', 'notes', 'client_name', 'client_address', 'task_type', 'client_id', 'needs_approval']
+const ALLOWED_PATCH_FIELDS = ['title', 'description', 'requester', 'requester_phone', 'requester_sector', 'sector', 'category', 'status', 'urgency', 'assignee_id', 'due_date', 'notes', 'client_name', 'client_address', 'task_type', 'client_id', 'needs_approval']
 const VALID_STATUSES = ['pendente', 'em_andamento', 'concluida', 'cancelada']
 
 export default async function handler(request) {
@@ -76,6 +76,18 @@ export default async function handler(request) {
     if (!data) return err('Task not found or not updated', 404)
 
     return ok(data)
+  }
+
+  // ── DELETE /api/v1/task?id=UUID ────────────────────────────────────────────
+  if (request.method === 'DELETE') {
+    const { error } = await supabase
+      .from('tasks')
+      .delete()
+      .eq('id', id)
+      .eq('company_id', company.id)
+
+    if (error) return err(error.message)
+    return ok({ deleted: true, id })
   }
 
   return err('Method not allowed', 405)
