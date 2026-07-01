@@ -52,11 +52,14 @@ export default async function handler(req) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
     }
 
-    // Get company_id from user metadata or profiles table
-    const companyId = user.user_metadata?.company_id
-
+    // Resolve company_id — super admin não tem no metadata, busca da tabela
+    let companyId = user.user_metadata?.company_id
     if (!companyId) {
-      return new Response(JSON.stringify({ error: 'company_id not found for user' }), { status: 400 })
+      const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle()
+      companyId = co?.id
+    }
+    if (!companyId) {
+      return new Response(JSON.stringify({ error: 'company_id not found' }), { status: 400 })
     }
 
     // Parse multipart form data
@@ -98,12 +101,12 @@ export default async function handler(req) {
       return new Response(JSON.stringify({ error: 'Could not get public URL' }), { status: 500 })
     }
 
-    // Upsert brand_logo_url in config table
+    // Upsert brand_logo_url in config table (usa só 'key' como conflito)
     const { error: cfgErr } = await supabase
       .from('config')
       .upsert(
-        { key: 'brand_logo_url', value: publicUrl, company_id: companyId },
-        { onConflict: 'key,company_id' },
+        { key: 'brand_logo_url', value: publicUrl },
+        { onConflict: 'key' },
       )
 
     if (cfgErr) {
