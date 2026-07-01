@@ -245,16 +245,10 @@ export default function RequestQueue({ showToast, onCountChange }) {
   }
 
   // ── Links públicos ─────────────────────────────────────────────────────────
-  const portalUrl  = `${window.location.origin}/portal${inviteCode ? `?c=${inviteCode}` : ''}`
-  const publicUrl  = `${window.location.origin}/solicitar${inviteCode ? `?c=${inviteCode}` : ''}`
-  const trackUrl   = `${window.location.origin}/acompanhar${inviteCode ? `?c=${inviteCode}` : ''}`
-  const qrPortal   = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(portalUrl)}`
-  const qrUrl      = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(publicUrl)}`
-  const qrTrackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(trackUrl)}`
+  const portalUrl = `${window.location.origin}/portal${inviteCode ? `?c=${inviteCode}` : ''}`
+  const qrPortal  = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(portalUrl)}`
 
-  function copyPortal()    { navigator.clipboard.writeText(portalUrl).then(() => showToast('Link do portal copiado! ✓')) }
-  function copyLink()      { navigator.clipboard.writeText(publicUrl).then(() => showToast('Link de solicitação copiado! ✓')) }
-  function copyTrackLink() { navigator.clipboard.writeText(trackUrl).then(() => showToast('Link de acompanhamento copiado! ✓')) }
+  function copyPortal() { navigator.clipboard.writeText(portalUrl).then(() => showToast('Link do portal copiado! ✓')) }
 
   // ── Fotos ─────────────────────────────────────────────────────────────────
   function getPhotos(task) {
@@ -313,30 +307,6 @@ export default function RequestQueue({ showToast, onCountChange }) {
           </div>
         </div>
 
-        {/* Links individuais — discretos */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'.75rem' }}>
-          {[
-            { label:'📤 Só Solicitação', url: publicUrl, qr: qrUrl, copy: copyLink, dl:'qr-solicitar.png', color:'var(--blue)' },
-            { label:'🔍 Só Acompanhar',  url: trackUrl,  qr: qrTrackUrl, copy: copyTrackLink, dl:'qr-acompanhar.png', color:'var(--green)' },
-          ].map(item => (
-            <div key={item.label} style={{ background:'var(--bg)', borderRadius:8, padding:'.75rem', border:'1px solid var(--border)' }}>
-              <div style={{ fontSize:'.68rem', fontWeight:700, color:item.color, letterSpacing:'.07em', marginBottom:'.4rem' }}>{item.label}</div>
-              <div style={{ display:'flex', gap:'.3rem', marginBottom:'.3rem' }}>
-                <input className="finput" readOnly value={item.url}
-                  style={{ flex:1, fontSize:'.65rem', fontFamily:'var(--mono)', background:'var(--card)', padding:'.3rem .5rem' }} />
-                <button className="btn-primary" onClick={item.copy}
-                  style={{ fontSize:'.72rem', padding:'.3rem .55rem' }}>📋</button>
-              </div>
-              <div style={{ display:'flex', gap:'.75rem', alignItems:'center' }}>
-                <a href={item.url} target="_blank" rel="noopener noreferrer"
-                  style={{ fontSize:'.72rem', color:item.color, textDecoration:'none' }}>↗ Abrir</a>
-                <img src={item.qr} alt="QR" style={{ width:56, height:56, borderRadius:4, border:'1px solid var(--border)' }} />
-                <a href={item.qr} download={item.dl}
-                  style={{ fontSize:'.65rem', color:'var(--muted)', textDecoration:'none' }}>⬇ QR</a>
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* Abas */}
