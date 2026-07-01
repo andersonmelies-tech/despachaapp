@@ -779,7 +779,7 @@ export default function Settings({ showToast, user, session }) {
       {tab === 'providers' && <ProvidersPanel  showToast={showToast} />}
       {tab === 'sla'       && <SLAPanel        showToast={showToast} />}
       {tab === 'sectors'   && <SectorsPanel    showToast={showToast} />}
-      {tab === 'users'     && <UsersPanel      showToast={showToast} user={user} />}
+      {tab === 'users'     && <UsersPanel      showToast={showToast} user={user} session={session} />}
       {tab === 'api'       && <ApiDocs         showToast={showToast} />}
       {tab === 'branding'  && <BrandingPanel   showToast={showToast} />}
       {tab === 'fiscal'    && <FiscalPanel     showToast={showToast} />}
