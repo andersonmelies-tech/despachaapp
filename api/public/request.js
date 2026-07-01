@@ -27,7 +27,7 @@ export default async function handler(req) {
   let body
   try { body = await req.json() } catch { return json({ error: 'JSON inválido' }, 400) }
 
-  const { name, phone, location, description, photos, invite_code } = body
+  const { name, phone, location, requester_sector, category, description, photos, invite_code } = body
 
   if (!name?.trim())        return json({ error: 'Nome obrigatório' }, 400)
   if (!description?.trim()) return json({ error: 'Descrição obrigatória' }, 400)
@@ -53,17 +53,25 @@ export default async function handler(req) {
   // Monta título resumido
   const title = description.trim().slice(0, 80)
 
+  // SLA: média = 24h
+  const sla_deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+  const due_date     = sla_deadline.split('T')[0]
+
   // Insere tarefa sem fotos primeiro (para ter o ID)
   const { data: task, error } = await sb.from('tasks').insert({
     title,
-    description:      description.trim(),
-    requester:        name.trim(),
-    requester_phone:  phone.trim(),
-    sector:           location?.trim() || null,
-    status:           'pendente',
-    urgency:          'media',
-    source:           'publico',
-    needs_approval:   true,
+    description:       description.trim(),
+    requester:         name.trim(),
+    requester_phone:   phone.trim(),
+    requester_sector:  requester_sector?.trim() || null,
+    sector:            location?.trim() || null,
+    category:          category?.trim() || null,
+    status:            'pendente',
+    urgency:           'media',
+    sla_deadline,
+    due_date,
+    source:            'publico',
+    needs_approval:    true,
     provider_notified: false,
     company_id,
     assignee: 'A definir',

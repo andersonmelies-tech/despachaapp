@@ -28,7 +28,7 @@ export default function PublicRequestForm() {
   const params     = new URLSearchParams(window.location.search)
   const inviteCode = params.get('c') || ''
 
-  const [f, setF] = useState({ name: '', phone: '', location: '', description: '' })
+  const [f, setF] = useState({ name: '', phone: '', requester_sector: '', location: '', category: '', description: '' })
   const [photos,    setPhotos]  = useState([])
   const [sending,   setSending] = useState(false)
   const [done,      setDone]    = useState(null)  // { protocol, phone }
@@ -77,12 +77,14 @@ export default function PublicRequestForm() {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name:        f.name.trim(),
-          phone:       f.phone.trim(),
-          location:    locationValue,
-          description: f.description.trim(),
-          photos:      photos.length ? photos : null,
-          invite_code: inviteCode,
+          name:             f.name.trim(),
+          phone:            f.phone.trim(),
+          requester_sector: f.requester_sector?.trim() || null,
+          location:         locationValue,
+          category:         f.category?.trim() || null,
+          description:      f.description.trim(),
+          photos:           photos.length ? photos : null,
+          invite_code:      inviteCode,
         }),
       })
       const data = await res.json()
@@ -195,7 +197,7 @@ export default function PublicRequestForm() {
 
             <button
               style={{ ...styles.btnSecondary, width:'100%', marginTop:'1rem', textAlign:'center' }}
-              onClick={() => { setDone(null); setF({ name:'', phone:'', location:'', description:'', locationCustom:'' }); setPhotos([]); setCopied(false) }}
+              onClick={() => { setDone(null); setF({ name:'', phone:'', requester_sector:'', location:'', category:'', description:'', locationCustom:'' }); setPhotos([]); setCopied(false) }}
             >
               + Nova solicitação
             </button>
@@ -275,9 +277,33 @@ export default function PublicRequestForm() {
             />
           </div>
 
+          {/* Setor do solicitante */}
+          <div style={styles.field}>
+            <label style={styles.label}>SEU SETOR / DEPARTAMENTO</label>
+            {sectors.length > 0 ? (
+              <select
+                style={{ ...styles.input, cursor: 'pointer', color: f.requester_sector ? '#1a1a2e' : '#9ca3af' }}
+                value={f.requester_sector}
+                onChange={e => set('requester_sector', e.target.value)}
+              >
+                <option value="">Selecione seu setor…</option>
+                {sectors.map(s => (
+                  <option key={s.id} value={s.name}>{s.name}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                style={styles.input}
+                placeholder="Ex: Operações, Administrativo, TI…"
+                value={f.requester_sector}
+                onChange={e => set('requester_sector', e.target.value)}
+              />
+            )}
+          </div>
+
           {/* Local / Setor */}
           <div style={styles.field}>
-            <label style={styles.label}>LOCAL / SETOR</label>
+            <label style={styles.label}>LOCAL / SETOR DO PROBLEMA</label>
             {sectors.length > 0 ? (
               <select
                 style={{ ...styles.input, cursor: 'pointer', color: f.location ? '#1a1a2e' : '#9ca3af' }}
@@ -308,6 +334,17 @@ export default function PublicRequestForm() {
                 autoFocus
               />
             )}
+          </div>
+
+          {/* Categoria */}
+          <div style={styles.field}>
+            <label style={styles.label}>TIPO DE SERVIÇO</label>
+            <input
+              style={styles.input}
+              placeholder="Ex: Elétrica, Hidráulica, TI, Limpeza…"
+              value={f.category}
+              onChange={e => set('category', e.target.value)}
+            />
           </div>
 
           {/* Descrição */}
