@@ -23,11 +23,16 @@ export default function PublicTrackForm() {
   const [result,   setResult]   = useState(null)
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
+  const [brand,    setBrand]    = useState({ logo_url: null, primary_color: '#2563eb', company_name: null })
 
-  // Se veio com ?p=NUMERO, busca automaticamente
   useEffect(() => {
+    fetch(`/api/public/branding?c=${inviteCode}`).then(r => r.json())
+      .then(d => { if (d.primary_color || d.logo_url) setBrand(d) }).catch(() => {})
     if (preProtocol) search(null, preProtocol)
   }, [])
+
+  const color     = brand.primary_color || '#2563eb'
+  const colorDark = '#1e3a5f'
 
   async function search(e, forceProt) {
     if (e) e.preventDefault()
@@ -51,23 +56,26 @@ export default function PublicTrackForm() {
   const currentStep = result ? STATUS_STEPS.indexOf(result.status) : -1
 
   return (
-    <div style={S.page}>
+    <div style={{ ...S.page, background: `linear-gradient(135deg, ${colorDark} 0%, ${color} 100%)` }}>
 
-      {/* Logo */}
+      {/* Logo da empresa */}
       <div style={{ width: '100%', maxWidth: 480, marginBottom: '1.25rem', marginTop: '1rem', textAlign: 'center' }}>
-        <img
-          src="/logo.png"
-          alt="DespachaApp"
-          style={{ width: '100%', maxWidth: 480, height: 'auto', objectFit: 'contain',
-            filter: 'drop-shadow(0 3px 14px rgba(0,0,0,.45))' }}
-          onError={e => { e.target.style.display = 'none' }}
-        />
+        {brand.logo_url ? (
+          <img src={brand.logo_url} alt={brand.company_name || 'Logo'}
+            style={{ maxHeight: 80, maxWidth: 480, width: 'auto', objectFit: 'contain',
+              filter: 'drop-shadow(0 3px 14px rgba(0,0,0,.45))' }} />
+        ) : (
+          <img src="/logo.png" alt="DespachaApp"
+            style={{ width: '100%', maxWidth: 480, height: 'auto', objectFit: 'contain',
+              filter: 'drop-shadow(0 3px 14px rgba(0,0,0,.45))' }}
+            onError={e => { e.target.style.display = 'none' }} />
+        )}
       </div>
 
       <div style={S.card}>
 
-        {/* Header */}
-        <div style={S.header}>
+        {/* Header com cor da empresa */}
+        <div style={{ ...S.header, background: `linear-gradient(135deg, ${colorDark}, ${color})` }}>
           <div style={S.headerIcon}>🔍</div>
           <div>
             <h1 style={S.headerTitle}>Acompanhar Solicitação</h1>

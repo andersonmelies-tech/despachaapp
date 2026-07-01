@@ -245,11 +245,14 @@ export default function RequestQueue({ showToast, onCountChange }) {
   }
 
   // ── Links públicos ─────────────────────────────────────────────────────────
+  const portalUrl  = `${window.location.origin}/portal${inviteCode ? `?c=${inviteCode}` : ''}`
   const publicUrl  = `${window.location.origin}/solicitar${inviteCode ? `?c=${inviteCode}` : ''}`
   const trackUrl   = `${window.location.origin}/acompanhar${inviteCode ? `?c=${inviteCode}` : ''}`
-  const qrUrl      = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(publicUrl)}`
-  const qrTrackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(trackUrl)}`
+  const qrPortal   = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(portalUrl)}`
+  const qrUrl      = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(publicUrl)}`
+  const qrTrackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(trackUrl)}`
 
+  function copyPortal()    { navigator.clipboard.writeText(portalUrl).then(() => showToast('Link do portal copiado! ✓')) }
   function copyLink()      { navigator.clipboard.writeText(publicUrl).then(() => showToast('Link de solicitação copiado! ✓')) }
   function copyTrackLink() { navigator.clipboard.writeText(trackUrl).then(() => showToast('Link de acompanhamento copiado! ✓')) }
 
@@ -282,62 +285,57 @@ export default function RequestQueue({ showToast, onCountChange }) {
           🔗 LINKS PARA CLIENTES
         </div>
 
-        {/* Grade: solicitação + acompanhamento lado a lado */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem', marginBottom:'1.25rem' }}>
-
-          {/* Solicitação */}
-          <div style={{ background:'var(--bg)', borderRadius:10, padding:'1rem', border:'1px solid var(--border)' }}>
-            <div style={{ fontSize:'.72rem', fontWeight:700, color:'var(--blue)', letterSpacing:'.07em', marginBottom:'.6rem' }}>
-              📤 ABRIR SOLICITAÇÃO
+        {/* Portal unificado — destaque */}
+        <div style={{ background:'linear-gradient(135deg,#1e3a5f,#2563eb)', borderRadius:12, padding:'1.25rem', marginBottom:'1rem', display:'flex', gap:'1.25rem', alignItems:'center', flexWrap:'wrap' }}>
+          <div style={{ flex:1, minWidth:200 }}>
+            <div style={{ fontSize:'.72rem', fontWeight:700, color:'rgba(255,255,255,.7)', letterSpacing:'.08em', marginBottom:'.4rem' }}>
+              🌐 PORTAL ÚNICO (solicitar + acompanhar)
             </div>
-            <p style={{ fontSize:'.78rem', color:'var(--muted)', marginBottom:'.6rem', lineHeight:1.45 }}>
-              Enviar para quem vai <strong>abrir</strong> um chamado.
+            <p style={{ fontSize:'.8rem', color:'rgba(255,255,255,.85)', marginBottom:'.65rem', lineHeight:1.4 }}>
+              Um único QR/link para tudo — o cliente escolhe o que fazer.
             </p>
             <div style={{ display:'flex', gap:'.4rem', marginBottom:'.4rem' }}>
-              <input className="finput" readOnly value={publicUrl}
-                style={{ flex:1, fontSize:'.72rem', fontFamily:'var(--mono)', background:'var(--card)' }} />
-              <button className="btn-primary" onClick={copyLink} style={{ whiteSpace:'nowrap', fontSize:'.78rem', padding:'.4rem .7rem' }}>
+              <input readOnly value={portalUrl}
+                style={{ flex:1, fontSize:'.72rem', fontFamily:'monospace', background:'rgba(255,255,255,.12)', border:'1px solid rgba(255,255,255,.25)', borderRadius:6, padding:'.4rem .6rem', color:'#fff' }} />
+              <button onClick={copyPortal}
+                style={{ background:'rgba(255,255,255,.2)', border:'1px solid rgba(255,255,255,.3)', borderRadius:6, color:'#fff', padding:'.4rem .7rem', cursor:'pointer', fontSize:'.78rem', fontWeight:700 }}>
                 📋
               </button>
             </div>
-            <div style={{ display:'flex', gap:'1rem', alignItems:'center' }}>
-              <a href={publicUrl} target="_blank" rel="noopener noreferrer"
-                style={{ fontSize:'.75rem', color:'var(--blue)', textDecoration:'none' }}>↗ Abrir</a>
-              <div style={{ textAlign:'center' }}>
-                <img src={qrUrl} alt="QR" style={{ width:80, height:80, borderRadius:6, border:'1px solid var(--border)', display:'block' }} />
-                <a href={qrUrl} download="qr-solicitar.png"
+            <a href={portalUrl} target="_blank" rel="noopener noreferrer"
+              style={{ fontSize:'.75rem', color:'rgba(255,255,255,.8)', textDecoration:'none' }}>↗ Abrir portal</a>
+          </div>
+          <div style={{ textAlign:'center' }}>
+            <img src={qrPortal} alt="QR Portal"
+              style={{ width:140, height:140, borderRadius:10, background:'#fff', padding:6, display:'block' }} />
+            <a href={qrPortal} download="qr-portal.png"
+              style={{ fontSize:'.68rem', color:'rgba(255,255,255,.7)', textDecoration:'none', marginTop:'.3rem', display:'block' }}>⬇ Baixar QR</a>
+          </div>
+        </div>
+
+        {/* Links individuais — discretos */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'.75rem' }}>
+          {[
+            { label:'📤 Só Solicitação', url: publicUrl, qr: qrUrl, copy: copyLink, dl:'qr-solicitar.png', color:'var(--blue)' },
+            { label:'🔍 Só Acompanhar',  url: trackUrl,  qr: qrTrackUrl, copy: copyTrackLink, dl:'qr-acompanhar.png', color:'var(--green)' },
+          ].map(item => (
+            <div key={item.label} style={{ background:'var(--bg)', borderRadius:8, padding:'.75rem', border:'1px solid var(--border)' }}>
+              <div style={{ fontSize:'.68rem', fontWeight:700, color:item.color, letterSpacing:'.07em', marginBottom:'.4rem' }}>{item.label}</div>
+              <div style={{ display:'flex', gap:'.3rem', marginBottom:'.3rem' }}>
+                <input className="finput" readOnly value={item.url}
+                  style={{ flex:1, fontSize:'.65rem', fontFamily:'var(--mono)', background:'var(--card)', padding:'.3rem .5rem' }} />
+                <button className="btn-primary" onClick={item.copy}
+                  style={{ fontSize:'.72rem', padding:'.3rem .55rem' }}>📋</button>
+              </div>
+              <div style={{ display:'flex', gap:'.75rem', alignItems:'center' }}>
+                <a href={item.url} target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize:'.72rem', color:item.color, textDecoration:'none' }}>↗ Abrir</a>
+                <img src={item.qr} alt="QR" style={{ width:56, height:56, borderRadius:4, border:'1px solid var(--border)' }} />
+                <a href={item.qr} download={item.dl}
                   style={{ fontSize:'.65rem', color:'var(--muted)', textDecoration:'none' }}>⬇ QR</a>
               </div>
             </div>
-          </div>
-
-          {/* Acompanhamento */}
-          <div style={{ background:'var(--bg)', borderRadius:10, padding:'1rem', border:'1px solid var(--border)' }}>
-            <div style={{ fontSize:'.72rem', fontWeight:700, color:'var(--green)', letterSpacing:'.07em', marginBottom:'.6rem' }}>
-              🔍 ACOMPANHAR PROTOCOLO
-            </div>
-            <p style={{ fontSize:'.78rem', color:'var(--muted)', marginBottom:'.6rem', lineHeight:1.45 }}>
-              Enviar para quem quer <strong>consultar</strong> o status.
-            </p>
-            <div style={{ display:'flex', gap:'.4rem', marginBottom:'.4rem' }}>
-              <input className="finput" readOnly value={trackUrl}
-                style={{ flex:1, fontSize:'.72rem', fontFamily:'var(--mono)', background:'var(--card)' }} />
-              <button className="btn-primary" onClick={copyTrackLink}
-                style={{ whiteSpace:'nowrap', fontSize:'.78rem', padding:'.4rem .7rem', background:'var(--green)' }}>
-                📋
-              </button>
-            </div>
-            <div style={{ display:'flex', gap:'1rem', alignItems:'center' }}>
-              <a href={trackUrl} target="_blank" rel="noopener noreferrer"
-                style={{ fontSize:'.75rem', color:'var(--green)', textDecoration:'none' }}>↗ Abrir</a>
-              <div style={{ textAlign:'center' }}>
-                <img src={qrTrackUrl} alt="QR" style={{ width:80, height:80, borderRadius:6, border:'1px solid var(--border)', display:'block' }} />
-                <a href={qrTrackUrl} download="qr-acompanhar.png"
-                  style={{ fontSize:'.65rem', color:'var(--muted)', textDecoration:'none' }}>⬇ QR</a>
-              </div>
-            </div>
-          </div>
-
+          ))}
         </div>
       </div>
 

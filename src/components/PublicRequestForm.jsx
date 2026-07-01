@@ -34,16 +34,22 @@ export default function PublicRequestForm() {
   const [done,      setDone]    = useState(null)  // { protocol }
   const [error,     setError]   = useState('')
   const [sectors,   setSectors] = useState([])
+  const [brand,     setBrand]   = useState({ logo_url: null, primary_color: '#2563eb', company_name: null })
   const fileRef = useRef()
 
-  // Carrega setores da empresa pelo invite_code
+  // Carrega branding e setores em paralelo
   useEffect(() => {
-    if (!inviteCode) return
-    fetch(`/api/public/sectors?c=${inviteCode}`)
-      .then(r => r.json())
-      .then(d => { if (d.sectors?.length) setSectors(d.sectors) })
-      .catch(() => {})
+    Promise.all([
+      fetch(`/api/public/branding?c=${inviteCode}`).then(r => r.json()).catch(() => ({})),
+      inviteCode ? fetch(`/api/public/sectors?c=${inviteCode}`).then(r => r.json()).catch(() => ({})) : Promise.resolve({}),
+    ]).then(([b, s]) => {
+      if (b.primary_color || b.logo_url) setBrand(b)
+      if (s.sectors?.length) setSectors(s.sectors)
+    })
   }, [inviteCode])
+
+  const color     = brand.primary_color || '#2563eb'
+  const colorDark = '#1e3a5f'
 
   function set(k, v) { setF(p => ({ ...p, [k]: v })) }
 
@@ -133,38 +139,37 @@ export default function PublicRequestForm() {
 
   // ── Formulário ───────────────────────────────────────────────────────────────
   return (
-    <div style={styles.page}>
+    <div style={{ ...styles.page, background: `linear-gradient(135deg, ${colorDark} 0%, ${color} 100%)` }}>
 
-      {/* Logo acima do card, sobre o gradiente */}
+      {/* Logo da empresa acima do card */}
       <div style={{ width: '100%', maxWidth: 480, marginBottom: '1.25rem', marginTop: '1rem', textAlign: 'center' }}>
-        <img
-          src="/logo.png"
-          alt="DespachaApp"
-          style={{
-            width: '100%',
-            maxWidth: 480,
-            height: 'auto',
-            objectFit: 'contain',
-            filter: 'drop-shadow(0 3px 14px rgba(0,0,0,.45))',
-          }}
-          onError={e => { e.target.style.display = 'none' }}
-        />
+        {brand.logo_url ? (
+          <img
+            src={brand.logo_url}
+            alt={brand.company_name || 'Logo'}
+            style={{ maxHeight: 80, maxWidth: 480, width: 'auto', height: 'auto', objectFit: 'contain',
+              filter: 'drop-shadow(0 3px 14px rgba(0,0,0,.45))' }}
+          />
+        ) : (
+          <img
+            src="/logo.png"
+            alt="DespachaApp"
+            style={{ width: '100%', maxWidth: 480, height: 'auto', objectFit: 'contain',
+              filter: 'drop-shadow(0 3px 14px rgba(0,0,0,.45))' }}
+            onError={e => { e.target.style.display = 'none' }}
+          />
+        )}
       </div>
 
       <div style={styles.card}>
 
-        {/* Header */}
-        <div style={styles.header}>
+        {/* Header com cor da empresa */}
+        <div style={{ ...styles.header, background: `linear-gradient(135deg, ${colorDark}, ${color})` }}>
           <img
             src="/icon.png"
             alt=""
-            style={{
-              width: 52, height: 52,
-              objectFit: 'cover',
-              borderRadius: 14,
-              flexShrink: 0,
-              boxShadow: '0 2px 10px rgba(0,0,0,.3)',
-            }}
+            style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 14,
+              flexShrink: 0, boxShadow: '0 2px 10px rgba(0,0,0,.3)' }}
             onError={e => { e.target.style.display = 'none' }}
           />
           <div>
@@ -291,7 +296,7 @@ export default function PublicRequestForm() {
           {/* Submit */}
           <button
             type="submit"
-            style={{ ...styles.btnSubmit, opacity: sending ? .7 : 1 }}
+            style={{ ...styles.btnSubmit, background: `linear-gradient(135deg, ${colorDark}, ${color})`, opacity: sending ? .7 : 1 }}
             disabled={sending}
           >
             {sending ? '⏳ Enviando…' : '📤 ENVIAR SOLICITAÇÃO'}

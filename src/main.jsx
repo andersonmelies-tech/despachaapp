@@ -13,6 +13,9 @@ async function mount() {
   } else if (path.startsWith('/acompanhar')) {
     const { default: PublicTrackForm } = await import('./components/PublicTrackForm.jsx')
     root.render(<React.StrictMode><PublicTrackForm /></React.StrictMode>)
+  } else if (path.startsWith('/portal')) {
+    const { default: PublicPortal } = await import('./components/PublicPortal.jsx')
+    root.render(<React.StrictMode><PublicPortal /></React.StrictMode>)
   } else {
     const { default: App } = await import('./App.jsx')
     root.render(<React.StrictMode><App /></React.StrictMode>)
