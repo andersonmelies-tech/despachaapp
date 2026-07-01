@@ -31,8 +31,9 @@ export default function PublicRequestForm() {
   const [f, setF] = useState({ name: '', phone: '', location: '', description: '' })
   const [photos,    setPhotos]  = useState([])
   const [sending,   setSending] = useState(false)
-  const [done,      setDone]    = useState(null)  // { protocol }
+  const [done,      setDone]    = useState(null)  // { protocol, phone }
   const [error,     setError]   = useState('')
+  const [copied,    setCopied]  = useState(false)
   const [sectors,   setSectors] = useState([])
   const [brand,     setBrand]   = useState({ logo_url: null, primary_color: '#2563eb', company_name: null })
   const fileRef = useRef()
@@ -86,7 +87,7 @@ export default function PublicRequestForm() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Erro ao enviar')
-      setDone({ protocol: data.protocol })
+      setDone({ protocol: data.protocol, phone: f.phone.trim() })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -96,42 +97,111 @@ export default function PublicRequestForm() {
 
   // ── Tela de sucesso ──────────────────────────────────────────────────────────
   if (done) {
+    const protocolStr  = String(done.protocol).padStart(5, '0')
+    const trackingUrl  = `${window.location.origin}/acompanhar?p=${done.protocol}${inviteCode ? '&c=' + inviteCode : ''}`
+    const waPhone      = done.phone.replace(/\D/g, '').replace(/^0/, '')
+    const waNumber     = waPhone.startsWith('55') ? waPhone : `55${waPhone}`
+    const waMsg        = encodeURIComponent(
+      `✅ Sua solicitação foi registrada!\n\n🔢 Protocolo: *#${protocolStr}*\n\n🔍 Acompanhe o status pelo link:\n${trackingUrl}`
+    )
+    const waUrl = `https://wa.me/${waNumber}?text=${waMsg}`
+
+    function copyLink() {
+      navigator.clipboard.writeText(trackingUrl).then(() => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2500)
+      })
+    }
+
     return (
-      <div style={styles.page}>
+      <div style={{ ...styles.page, background: `linear-gradient(135deg, ${colorDark} 0%, ${color} 100%)` }}>
+        {brand.logo_url && (
+          <div style={{ width:'100%', maxWidth:480, marginBottom:'1.25rem', marginTop:'1rem', textAlign:'center' }}>
+            <img src={brand.logo_url} alt={brand.company_name || 'Logo'}
+              style={{ maxHeight:70, maxWidth:280, objectFit:'contain', filter:'drop-shadow(0 3px 14px rgba(0,0,0,.45))' }} />
+          </div>
+        )}
         <div style={styles.card}>
-          <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
-            <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>✅</div>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '.5rem', color: '#1a1a2e' }}>
-              Solicitação enviada!
-            </h2>
-            <p style={{ color: '#666', marginBottom: '1.5rem', lineHeight: 1.5 }}>
-              Sua solicitação foi registrada. Em breve nossa equipe entrará em contato.
+          {/* Header */}
+          <div style={{ background:`linear-gradient(135deg, ${colorDark}, ${color})`, padding:'1.5rem', textAlign:'center' }}>
+            <div style={{ fontSize:'3rem', marginBottom:'.5rem' }}>✅</div>
+            <h2 style={{ margin:0, fontSize:'1.2rem', fontWeight:800, color:'#fff' }}>Solicitação enviada!</h2>
+            <p style={{ margin:'.4rem 0 0', fontSize:'.82rem', color:'rgba(255,255,255,.8)' }}>
+              Nossa equipe já foi notificada e irá atender em breve.
             </p>
-            <div style={styles.protocolBox}>
-              <div style={{ fontSize: '.75rem', color: '#888', marginBottom: '.25rem', textTransform: 'uppercase', letterSpacing: '.08em' }}>
+          </div>
+
+          <div style={{ padding:'1.5rem' }}>
+            {/* Protocolo */}
+            <div style={{ textAlign:'center', marginBottom:'1.5rem' }}>
+              <div style={{ fontSize:'.7rem', fontWeight:700, color:'#9ca3af', letterSpacing:'.1em', textTransform:'uppercase', marginBottom:'.5rem' }}>
                 Número do protocolo
               </div>
-              <div style={{ fontSize: '2rem', fontWeight: 900, fontFamily: 'monospace', color: '#2563eb' }}>
-                #{String(done.protocol).padStart(5, '0')}
+              <div style={{
+                display:'inline-block', background:'#eff6ff', border:'2px solid #bfdbfe',
+                borderRadius:14, padding:'1rem 2rem',
+              }}>
+                <div style={{ fontSize:'2.2rem', fontWeight:900, fontFamily:'monospace', color:color, letterSpacing:'.05em' }}>
+                  #{protocolStr}
+                </div>
+              </div>
+              <div style={{ fontSize:'.75rem', color:'#9ca3af', marginTop:'.6rem' }}>
+                Guarde este número para consultar o status do atendimento.
               </div>
             </div>
-            <p style={{ fontSize: '.8rem', color: '#999', marginTop: '1rem' }}>
-              Guarde este número para acompanhar seu atendimento.
-            </p>
-            {/* Botão para acompanhar */}
-            <a
-              href={`/acompanhar?p=${done.protocol}${inviteCode ? '&c=' + inviteCode : ''}`}
-              style={{ ...styles.btnSubmit, display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: '1rem', fontSize: '.95rem' }}
-            >
-              🔍 Acompanhar minha solicitação
-            </a>
+
+            {/* Ações */}
+            <div style={{ display:'flex', flexDirection:'column', gap:'.75rem' }}>
+
+              {/* WhatsApp */}
+              <a href={waUrl} target="_blank" rel="noreferrer" style={{
+                display:'flex', alignItems:'center', justifyContent:'center', gap:'.6rem',
+                padding:'.85rem', borderRadius:10, textDecoration:'none',
+                background:'#25d366', color:'#fff', fontWeight:700, fontSize:'.95rem',
+                boxShadow:'0 4px 14px rgba(37,211,102,.35)',
+              }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                </svg>
+                Enviar protocolo pelo WhatsApp
+              </a>
+
+              {/* Copiar link */}
+              <button onClick={copyLink} style={{
+                display:'flex', alignItems:'center', justifyContent:'center', gap:'.6rem',
+                padding:'.85rem', borderRadius:10, cursor:'pointer',
+                border:`2px solid ${copied ? '#10b981' : '#e5e7eb'}`,
+                background: copied ? '#ecfdf5' : '#f9fafb',
+                color: copied ? '#059669' : '#374151',
+                fontWeight:700, fontSize:'.95rem', transition:'all .2s',
+              }}>
+                {copied
+                  ? <><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg> Link copiado!</>
+                  : <><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copiar link de acompanhamento</>
+                }
+              </button>
+
+              {/* Acompanhar agora */}
+              <a href={trackingUrl} style={{
+                display:'flex', alignItems:'center', justifyContent:'center', gap:'.6rem',
+                padding:'.75rem', borderRadius:10, textDecoration:'none',
+                background:`linear-gradient(135deg, ${colorDark}, ${color})`,
+                color:'#fff', fontWeight:700, fontSize:'.9rem',
+                boxShadow:`0 4px 14px ${color}44`,
+              }}>
+                🔍 Acompanhar agora
+              </a>
+            </div>
+
             <button
-              style={styles.btnSecondary}
-              onClick={() => { setDone(null); setF({ name: '', phone: '', location: '', description: '', locationCustom: '' }); setPhotos([]) }}
+              style={{ ...styles.btnSecondary, width:'100%', marginTop:'1rem', textAlign:'center' }}
+              onClick={() => { setDone(null); setF({ name:'', phone:'', location:'', description:'', locationCustom:'' }); setPhotos([]); setCopied(false) }}
             >
-              Nova solicitação
+              + Nova solicitação
             </button>
           </div>
+
+          <div style={styles.footer}>Powered by <strong>DespachaApp</strong></div>
         </div>
       </div>
     )
