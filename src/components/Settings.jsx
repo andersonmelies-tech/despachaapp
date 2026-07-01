@@ -627,52 +627,186 @@ function BrandingPanel({ showToast, session }) {
     setSaving(false)
   }
 
+  const colorDark = '#1e3a5f'
+  const PRESETS = ['#2563eb','#7c3aed','#059669','#dc2626','#d97706','#0891b2','#be185d','#1e3a5f']
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <div className="cfg-card">
-        <div className="cfg-title">🖼 Logo da Empresa</div>
-        <div style={{ display:'flex', alignItems:'center', gap:'1.5rem', flexWrap:'wrap' }}>
-          {logoUrl
-            ? <img src={logoUrl} alt="Logo" style={{ height:64, borderRadius:8, border:'1px solid var(--border)', background:'#fff', padding:4 }} />
-            : <div style={{ width:64, height:64, borderRadius:8, background:'var(--s2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.5rem' }}>🏢</div>
-          }
-          <div>
-            <label className="btn-primary" style={{ cursor:'pointer', display:'inline-block' }}>
-              {uploading ? '⏳ Enviando…' : '📤 Upload Logo'}
-              <input type="file" accept="image/*" style={{ display:'none' }} onChange={uploadLogo} disabled={uploading} />
-            </label>
-            <div style={{ fontSize:'.75rem', color:'var(--muted)', marginTop:'.4rem' }}>PNG ou SVG. Recomendado: fundo transparente, mín. 200×200px</div>
+    <div style={{ display:'flex', flexDirection:'column', gap:'1.25rem' }}>
+
+      {/* ── Cabeçalho da seção ── */}
+      <div style={{ borderBottom:'1px solid var(--border)', paddingBottom:'1rem' }}>
+        <h2 style={{ margin:0, fontSize:'1rem', fontWeight:700, color:'var(--text)' }}>Identidade Visual</h2>
+        <p style={{ margin:'.25rem 0 0', fontSize:'.82rem', color:'var(--muted)' }}>
+          Personalize os formulários públicos com a marca da sua empresa.
+        </p>
+      </div>
+
+      {/* ── Grid principal: esquerda = controles, direita = preview ── */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 340px', gap:'1.25rem', alignItems:'start' }}>
+
+        {/* Coluna esquerda — controles */}
+        <div style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
+
+          {/* Logo */}
+          <div className="cfg-card" style={{ padding:'1.25rem' }}>
+            <div style={{ fontSize:'.7rem', fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase', color:'var(--muted)', marginBottom:'.75rem' }}>
+              Logo da Empresa
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:'1.25rem' }}>
+              {/* Preview da logo */}
+              <div style={{
+                width:96, height:72, borderRadius:10, border:'1.5px dashed var(--border)',
+                background:'var(--s2)', display:'flex', alignItems:'center', justifyContent:'center',
+                overflow:'hidden', flexShrink:0,
+              }}>
+                {logoUrl
+                  ? <img src={logoUrl} alt="Logo" style={{ maxWidth:'100%', maxHeight:'100%', objectFit:'contain', padding:4 }} />
+                  : <span style={{ fontSize:'1.6rem', opacity:.4 }}>🏢</span>
+                }
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{
+                  display:'inline-flex', alignItems:'center', gap:'.5rem',
+                  padding:'.5rem 1rem', borderRadius:7, cursor:'pointer',
+                  border:'1.5px solid var(--border)', background:'var(--s1)',
+                  fontSize:'.85rem', fontWeight:600, color:'var(--text)',
+                  transition:'all .15s',
+                }}>
+                  {uploading
+                    ? <><span style={{ display:'inline-block', width:14, height:14, border:'2px solid var(--muted)', borderTopColor:'var(--blue)', borderRadius:'50%', animation:'spin .7s linear infinite' }} /> Enviando…</>
+                    : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Selecionar arquivo</>
+                  }
+                  <input type="file" accept="image/*,.svg" style={{ display:'none' }} onChange={uploadLogo} disabled={uploading} />
+                </label>
+                <div style={{ marginTop:'.5rem', fontSize:'.73rem', color:'var(--muted)', lineHeight:1.5 }}>
+                  PNG, SVG ou WebP · Fundo transparente recomendado · mín. 200×200 px
+                </div>
+                {logoUrl && (
+                  <button onClick={() => setLogoUrl('')} style={{
+                    marginTop:'.4rem', background:'none', border:'none', cursor:'pointer',
+                    fontSize:'.73rem', color:'#ef4444', padding:0,
+                  }}>Remover logo</button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Cor principal */}
+          <div className="cfg-card" style={{ padding:'1.25rem' }}>
+            <div style={{ fontSize:'.7rem', fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase', color:'var(--muted)', marginBottom:'.75rem' }}>
+              Cor Principal
+            </div>
+            {/* Presets */}
+            <div style={{ display:'flex', gap:'.5rem', marginBottom:'.85rem', flexWrap:'wrap' }}>
+              {PRESETS.map(c => (
+                <button key={c} onClick={() => setColor(c)} style={{
+                  width:28, height:28, borderRadius:6, background:c, border:'none', cursor:'pointer',
+                  boxShadow: color === c ? `0 0 0 2px var(--bg), 0 0 0 4px ${c}` : 'none',
+                  transition:'box-shadow .15s', flexShrink:0,
+                }} />
+              ))}
+            </div>
+            {/* Picker + hex */}
+            <div style={{ display:'flex', alignItems:'center', gap:'.75rem' }}>
+              <div style={{ position:'relative' }}>
+                <input type="color" value={color} onChange={e => setColor(e.target.value)}
+                  style={{ width:44, height:44, borderRadius:8, border:'1.5px solid var(--border)', cursor:'pointer', padding:2, background:'var(--s1)' }} />
+              </div>
+              <div style={{ flex:1 }}>
+                <input
+                  value={color}
+                  onChange={e => { if (/^#[0-9a-fA-F]{0,6}$/.test(e.target.value)) setColor(e.target.value) }}
+                  style={{
+                    width:'100%', padding:'.45rem .7rem', borderRadius:7,
+                    border:'1.5px solid var(--border)', background:'var(--s2)',
+                    color:'var(--text)', fontSize:'.9rem', fontFamily:'monospace', fontWeight:600,
+                    boxSizing:'border-box',
+                  }}
+                />
+              </div>
+              <div style={{
+                padding:'.4rem 1rem', borderRadius:7, background:color,
+                color:'#fff', fontSize:'.8rem', fontWeight:600,
+                boxShadow:`0 4px 14px ${color}55`, whiteSpace:'nowrap',
+              }}>
+                Botão exemplo
+              </div>
+            </div>
+          </div>
+
+          {/* E-mail */}
+          <div className="cfg-card" style={{ padding:'1.25rem' }}>
+            <div style={{ fontSize:'.7rem', fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase', color:'var(--muted)', marginBottom:'.75rem' }}>
+              Relatório Semanal por E-mail
+            </div>
+            <input className="finput" type="email" placeholder="gerencia@suaempresa.com.br"
+              value={email} onChange={e => setEmail(e.target.value)} style={{ width:'100%', boxSizing:'border-box' }} />
+            <div style={{ marginTop:'.5rem', fontSize:'.73rem', color:'var(--muted)' }}>
+              Toda segunda-feira às 8h você recebe um resumo com os dados da semana anterior.
+            </div>
+          </div>
+
+          {/* Botão salvar */}
+          <div style={{ display:'flex', gap:'.75rem', alignItems:'center' }}>
+            <button onClick={saveSettings} disabled={saving} style={{
+              padding:'.6rem 1.5rem', borderRadius:8, border:'none', cursor:'pointer',
+              background: saving ? 'var(--s2)' : `linear-gradient(135deg, ${colorDark}, ${color})`,
+              color:'#fff', fontSize:'.9rem', fontWeight:700,
+              boxShadow: saving ? 'none' : `0 4px 14px ${color}44`,
+              transition:'all .2s', opacity: saving ? .7 : 1,
+            }}>
+              {saving ? 'Salvando…' : 'Salvar alterações'}
+            </button>
           </div>
         </div>
-      </div>
 
-      <div className="cfg-card">
-        <div className="cfg-title">🎨 Cor Principal</div>
-        <div style={{ display:'flex', alignItems:'center', gap:'1rem' }}>
-          <input type="color" value={color} onChange={e => setColor(e.target.value)}
-            style={{ width:48, height:48, border:'none', borderRadius:8, cursor:'pointer', background:'none' }} />
-          <div>
-            <div style={{ fontWeight:600, color:'var(--text)' }}>{color}</div>
-            <div style={{ fontSize:'.75rem', color:'var(--muted)' }}>Aplicado em botões, badges e destaques</div>
+        {/* Coluna direita — preview do portal */}
+        <div style={{ position:'sticky', top:'1rem' }}>
+          <div style={{ fontSize:'.7rem', fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase', color:'var(--muted)', marginBottom:'.75rem' }}>
+            Preview — Formulário Público
           </div>
-          <div style={{ width:80, height:36, borderRadius:8, background:color, boxShadow:`0 0 16px ${color}44` }} />
+          <div style={{
+            borderRadius:12, overflow:'hidden', border:'1px solid var(--border)',
+            boxShadow:'0 8px 32px rgba(0,0,0,.25)', background:'#f9fafb',
+          }}>
+            {/* Header do formulário */}
+            <div style={{
+              background:`linear-gradient(135deg, ${colorDark}, ${color})`,
+              padding:'1rem', display:'flex', alignItems:'center', gap:'.75rem',
+            }}>
+              {logoUrl
+                ? <img src={logoUrl} alt="Logo" style={{ height:36, maxWidth:100, objectFit:'contain', filter:'drop-shadow(0 2px 6px rgba(0,0,0,.3))' }} />
+                : <div style={{ width:36, height:36, borderRadius:8, background:'rgba(255,255,255,.2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.1rem' }}>🏢</div>
+              }
+              <div>
+                <div style={{ color:'#fff', fontWeight:700, fontSize:'.85rem' }}>Nova Solicitação</div>
+                <div style={{ color:'rgba(255,255,255,.75)', fontSize:'.7rem' }}>Preencha os campos abaixo</div>
+              </div>
+            </div>
+            {/* Corpo do formulário */}
+            <div style={{ padding:'1rem', display:'flex', flexDirection:'column', gap:'.6rem' }}>
+              {['Título da solicitação', 'Local / Setor', 'Descrição'].map((lbl, i) => (
+                <div key={i}>
+                  <div style={{ fontSize:'.65rem', fontWeight:600, color:'#6b7280', marginBottom:'.25rem' }}>{lbl}</div>
+                  <div style={{ height: i === 2 ? 40 : 28, borderRadius:6, background:'#fff', border:'1.5px solid #e5e7eb' }} />
+                </div>
+              ))}
+              <div style={{
+                marginTop:'.25rem', padding:'.5rem', borderRadius:7, textAlign:'center',
+                background:`linear-gradient(135deg, ${colorDark}, ${color})`,
+                color:'#fff', fontSize:'.75rem', fontWeight:700,
+                boxShadow:`0 3px 10px ${color}44`,
+              }}>
+                Enviar Solicitação
+              </div>
+            </div>
+            <div style={{ textAlign:'center', padding:'.5rem', borderTop:'1px solid #e5e7eb', fontSize:'.65rem', color:'#9ca3af' }}>
+              Powered by <strong>DespachaApp</strong>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div className="cfg-card">
-        <div className="cfg-title">📧 E-mail para Relatório Semanal</div>
-        <div style={{ display:'flex', gap:'.65rem' }}>
-          <input className="finput" style={{ flex:1 }} type="email" placeholder="Ex: gerencia@suaempresa.com.br"
-            value={email} onChange={e => setEmail(e.target.value)} />
-        </div>
-        <div style={{ fontSize:'.75rem', color:'var(--muted)', marginTop:'.4rem' }}>
-          Toda segunda-feira às 8h você recebe um relatório com os dados da semana.
-        </div>
       </div>
-
-      <button className="btn-primary" style={{ alignSelf:'flex-start' }} onClick={saveSettings} disabled={saving}>
-        {saving ? 'Salvando…' : '💾 Salvar Configurações'}
-      </button>
     </div>
   )
 }
