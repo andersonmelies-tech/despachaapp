@@ -34,7 +34,6 @@ export default async function handler(req) {
     const { data: cfgRows } = await supabase
       .from('config')
       .select('key, value')
-      .eq('company_id', companyId)
       .in('key', ['brand_logo_url', 'brand_primary_color', 'report_email'])
 
     const cfg = {}
@@ -116,17 +115,15 @@ export default async function handler(req) {
 }
 
 async function upsertConfig(supabase, key, value, companyId) {
-  // Tenta UPDATE primeiro; se não existe, INSERT
-  const { data: existing } = await supabase
+  // UPDATE por key (PK) — atualiza também company_id caso esteja null de tentativas antigas
+  const { data } = await supabase
     .from('config')
-    .select('key')
+    .update({ value, company_id: companyId })
     .eq('key', key)
-    .eq('company_id', companyId)
-    .maybeSingle()
+    .select('key')
 
-  if (existing) {
-    return supabase.from('config').update({ value }).eq('key', key).eq('company_id', companyId)
-  } else {
-    return supabase.from('config').insert({ key, value, company_id: companyId })
+  if (!data || data.length === 0) {
+    // Linha não existe ainda — INSERT
+    await supabase.from('config').insert({ key, value, company_id: companyId })
   }
 }
