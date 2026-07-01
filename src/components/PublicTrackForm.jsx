@@ -4,7 +4,12 @@
  */
 import { useState, useEffect } from 'react'
 
-const STATUS_STEPS = ['pendente', 'em_andamento', 'concluida']
+const STEPS = [
+  { label: 'Aguardando\naprovação',  color: '#f59e0b' },
+  { label: 'Aguardando\ninício',     color: '#8b5cf6' },
+  { label: 'Em\natendimento',        color: '#3b82f6' },
+  { label: 'Concluído',             color: '#10b981' },
+]
 
 function fmtDate(iso) {
   if (!iso) return '–'
@@ -53,7 +58,7 @@ export default function PublicTrackForm() {
     }
   }
 
-  const currentStep = result ? STATUS_STEPS.indexOf(result.status) : -1
+  const currentStep = result?.step ?? -1
 
   return (
     <div style={{ ...S.page, background: `linear-gradient(135deg, ${colorDark} 0%, ${color} 100%)` }}>
@@ -118,36 +123,45 @@ export default function PublicTrackForm() {
               </div>
             </div>
 
-            {/* Barra de progresso */}
+            {/* Barra de progresso — 4 etapas */}
             {result.status !== 'cancelada' && (
               <div style={S.stepsWrap}>
-                {['Aguardando', 'Em atendimento', 'Concluído'].map((lbl, i) => (
-                  <div key={i} style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
-                    {/* Linha conectora */}
-                    {i < 2 && (
+                {STEPS.map((step, i) => {
+                  const done    = currentStep > i
+                  const active  = currentStep === i
+                  const pending = currentStep < i
+                  return (
+                    <div key={i} style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
+                      {/* Linha conectora */}
+                      {i < STEPS.length - 1 && (
+                        <div style={{
+                          position: 'absolute', top: 14, left: '50%', width: '100%', height: 3,
+                          background: done ? step.color : '#e5e7eb',
+                          transition: 'background .4s',
+                        }} />
+                      )}
+                      {/* Círculo */}
                       <div style={{
-                        position: 'absolute', top: 14, left: '50%', width: '100%', height: 3,
-                        background: currentStep > i ? '#10b981' : '#e5e7eb',
-                        transition: 'background .4s',
-                      }} />
-                    )}
-                    {/* Círculo */}
-                    <div style={{
-                      width: 28, height: 28, borderRadius: '50%', margin: '0 auto .4rem',
-                      background: currentStep >= i ? (i === 2 ? '#10b981' : i === 1 ? '#3b82f6' : '#f59e0b') : '#e5e7eb',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '.8rem', color: '#fff', fontWeight: 700,
-                      position: 'relative', zIndex: 1,
-                      boxShadow: currentStep === i ? `0 0 0 4px ${['#f59e0b','#3b82f6','#10b981'][i]}33` : 'none',
-                      transition: 'all .4s',
-                    }}>
-                      {currentStep > i ? '✓' : i + 1}
+                        width: 28, height: 28, borderRadius: '50%', margin: '0 auto .4rem',
+                        background: pending ? '#e5e7eb' : step.color,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '.8rem', color: '#fff', fontWeight: 700,
+                        position: 'relative', zIndex: 1,
+                        boxShadow: active ? `0 0 0 4px ${step.color}33` : 'none',
+                        transition: 'all .4s',
+                      }}>
+                        {done ? '✓' : i + 1}
+                      </div>
+                      <div style={{
+                        fontSize: '.62rem', lineHeight: 1.3, whiteSpace: 'pre-line',
+                        color: pending ? '#9ca3af' : '#374151',
+                        fontWeight: active ? 700 : 400,
+                      }}>
+                        {step.label}
+                      </div>
                     </div>
-                    <div style={{ fontSize: '.68rem', color: currentStep >= i ? '#374151' : '#9ca3af', fontWeight: currentStep === i ? 700 : 400 }}>
-                      {lbl}
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
 

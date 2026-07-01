@@ -56,7 +56,7 @@ export default async function handler(req) {
 
   const { data: task, error } = await sb
     .from('tasks')
-    .select('id, status, title, description, sector, assignee, created_at, updated_at, company_id')
+    .select('id, status, needs_approval, title, description, sector, assignee, created_at, updated_at, company_id')
     .eq('id', p)
     .eq('source', 'publico')
     .maybeSingle()
@@ -68,14 +68,27 @@ export default async function handler(req) {
     return json({ error: 'Protocolo não encontrado' }, 404)
   }
 
-  const st = STATUS_LABEL[task.status] || STATUS_LABEL.pendente
+  // Deriva step e label considerando needs_approval
+  let step, statusLabel, statusIcon, statusColor
+  if (task.status === 'cancelada') {
+    step = -1; statusLabel = 'Cancelado';                  statusIcon = '❌'; statusColor = '#ef4444'
+  } else if (task.status === 'concluida') {
+    step = 3;  statusLabel = 'Concluído';                  statusIcon = '✅'; statusColor = '#10b981'
+  } else if (task.status === 'em_andamento') {
+    step = 2;  statusLabel = 'Em atendimento';             statusIcon = '🔧'; statusColor = '#3b82f6'
+  } else if (task.needs_approval) {
+    step = 0;  statusLabel = 'Aguardando aprovação';       statusIcon = '⏳'; statusColor = '#f59e0b'
+  } else {
+    step = 1;  statusLabel = 'Aguardando início do serviço'; statusIcon = '📋'; statusColor = '#8b5cf6'
+  }
 
   return json({
     protocol:    task.id,
     status:      task.status,
-    statusLabel: st.label,
-    statusIcon:  st.icon,
-    statusColor: st.color,
+    step,
+    statusLabel,
+    statusIcon,
+    statusColor,
     title:       task.title,
     description: task.description,
     sector:      task.sector,
