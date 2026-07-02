@@ -54,11 +54,12 @@ export default async function handler(req) {
     company_id = co?.id
   }
 
+  // Numeração é sequencial: acompanha qualquer tarefa pelo protocolo,
+  // não só as criadas pelo formulário público (source='publico').
   const { data: task, error } = await sb
     .from('tasks')
     .select('id, status, needs_approval, title, description, sector, assignee, created_at, updated_at, company_id')
     .eq('id', p)
-    .eq('source', 'publico')
     .maybeSingle()
 
   if (error || !task) return json({ error: 'Protocolo não encontrado' }, 404)
