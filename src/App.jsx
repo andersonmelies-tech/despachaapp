@@ -7,6 +7,7 @@ import Sidebar     from './components/Sidebar.jsx'
 import Toast       from './components/Toast.jsx'
 import MobileNav   from './components/MobileNav.jsx'
 import TrialBanner from './components/TrialBanner.jsx'
+import TrocarSenha from './components/TrocarSenha.jsx'
 
 // Carregamento diferido — cada aba só carrega quando o usuário acessa
 const Dashboard   = lazy(() => import('./components/Dashboard.jsx'))
@@ -116,6 +117,16 @@ export default function App() {
   )
 
   if (!session) return <LandingPage onLogin={s => setSession(s)} showToast={showToast} />
+
+  // Troca de senha obrigatória no primeiro acesso
+  if (session.user?.user_metadata?.must_change_password) {
+    return (
+      <>
+        <TrocarSenha onConcluido={() => setSession(s => ({ ...s, user: { ...s.user, user_metadata: { ...s.user.user_metadata, must_change_password: false } } }))} />
+        <Toast msg={toast.msg} type={toast.type} visible={toast.visible} />
+      </>
+    )
+  }
 
   const meta      = session.user?.user_metadata || {}
   const isSuperAdmin = session.user?.email === ADMIN_EMAIL || meta?.is_superadmin === true

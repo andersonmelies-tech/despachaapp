@@ -70,6 +70,7 @@ export default async function handler(req) {
       username,
       role: newRole || 'operator',
       company_id,
+      must_change_password: true,
     }
   })
 

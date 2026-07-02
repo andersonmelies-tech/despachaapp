@@ -8,7 +8,7 @@ const SB_SERVICE = process.env.SUPABASE_SERVICE_KEY
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
-  'Access-Control-Allow-Methods': 'GET, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, DELETE, PATCH, OPTIONS',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
 }
 
@@ -64,6 +64,19 @@ export default async function handler(req) {
     if (target?.user?.user_metadata?.company_id !== company_id) return json({ error: 'Forbidden' }, 403)
 
     const { error } = await sbService.auth.admin.deleteUser(user_id)
+    if (error) return json({ error: error.message }, 500)
+    return json({ ok: true })
+  }
+
+  if (req.method === 'PATCH') {
+    const { user_id, password } = await req.json()
+    if (!user_id || !password) return json({ error: 'user_id e password obrigatórios' }, 400)
+    if (password.length < 6) return json({ error: 'Senha mínimo 6 caracteres' }, 400)
+
+    const { data: target } = await sbService.auth.admin.getUserById(user_id)
+    if (target?.user?.user_metadata?.company_id !== company_id) return json({ error: 'Forbidden' }, 403)
+
+    const { error } = await sbService.auth.admin.updateUserById(user_id, { password })
     if (error) return json({ error: error.message }, 500)
     return json({ ok: true })
   }
