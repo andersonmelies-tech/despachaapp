@@ -26,18 +26,7 @@ export default function Topbar({ user, onLogout }) {
       </div>
 
       <div className="topbar-right">
-        {/* Indicador de conexão ao vivo */}
-        <div title={rtStatus === 'connected' ? 'Painel ao vivo' : 'Reconectando…'}
-          style={{ display: 'flex', alignItems: 'center', gap: '.35rem', fontSize: '.72rem',
-            color: rtStatus === 'connected' ? 'var(--green)' : 'var(--warn)',
-            fontFamily: 'var(--mono)', letterSpacing: '.04em', padding: '0 .5rem' }}>
-          <span style={{
-            width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-            background: rtStatus === 'connected' ? 'var(--green)' : 'var(--warn)',
-            animation: rtStatus === 'connected' ? 'rtpulse 2.4s ease-in-out infinite' : 'none',
-          }} />
-          {rtStatus === 'connected' ? 'AO VIVO' : 'CONECTANDO'}
-        </div>
+        {/* Indicador de conexão ao vivo — removido */}
         <div className="user-pill">
           <span className="user-avatar">
             {(user?.name || user?.username || 'U')[0].toUpperCase()}
