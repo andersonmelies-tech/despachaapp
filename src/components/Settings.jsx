@@ -416,9 +416,12 @@ const ROLE_COLORS = { admin: 'var(--red)', manager: 'var(--warn)', operator: 'va
 function UsersPanel({ showToast, user: currentUser, session }) {
   const [users,   setUsers]   = useState([])
   const [loading, setLoading] = useState(true)
-  const [modal,   setModal]   = useState(false)
-  const [saving,  setSaving]  = useState(false)
-  const [deleting,setDeleting]= useState(null)
+  const [modal,      setModal]      = useState(false)
+  const [saving,     setSaving]     = useState(false)
+  const [deleting,   setDeleting]   = useState(null)
+  const [resetModal, setResetModal] = useState(null)
+  const [resetSenha, setResetSenha] = useState('')
+  const [resetando,  setResetando]  = useState(false)
   const [f, setF] = useState({ name: '', username: '', password: '', password2: '', role: 'operator' })
 
   const token = session?.access_token
@@ -453,6 +456,25 @@ function UsersPanel({ showToast, user: currentUser, session }) {
       loadUsers()
     } catch (e) { showToast('Erro de conexão', 'err') }
     setSaving(false)
+  }
+
+  async function resetarSenha() {
+    if (!resetSenha || resetSenha.length < 6) return showToast('Senha mínimo 6 caracteres', 'err')
+    setResetando(true)
+    try {
+      const res = await fetch('/api/users/list', {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: resetModal.id, password: resetSenha }),
+      })
+      const data = await res.json()
+      if (data.error) showToast('Erro: ' + data.error, 'err')
+      else {
+        showToast(`Senha de ${resetModal.name} redefinida — usuário deverá trocar no próximo login`)
+        setResetModal(null); setResetSenha('')
+      }
+    } catch { showToast('Erro de conexão', 'err') }
+    setResetando(false)
   }
 
   async function deleteUser(u) {
@@ -496,7 +518,7 @@ function UsersPanel({ showToast, user: currentUser, session }) {
 
       {/* Lista de usuários */}
       <div className="cfg-card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px 90px 80px', padding: '.6rem 1rem', background: 'var(--s2)', borderBottom: '1px solid var(--border)', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', letterSpacing: '.1em', textTransform: 'uppercase' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px 90px 110px', padding: '.6rem 1rem', background: 'var(--s2)', borderBottom: '1px solid var(--border)', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', letterSpacing: '.1em', textTransform: 'uppercase' }}>
           <span>Nome</span><span>Usuário</span><span>Permissão</span><span>Cadastro</span><span></span>
         </div>
         {loading ? (
@@ -504,7 +526,7 @@ function UsersPanel({ showToast, user: currentUser, session }) {
         ) : users.length === 0 ? (
           <div className="empty">Nenhum usuário encontrado</div>
         ) : users.map(u => (
-          <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px 90px 80px', padding: '.75rem 1rem', borderBottom: '1px solid var(--border)', alignItems: 'center' }}>
+          <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px 90px 110px', padding: '.75rem 1rem', borderBottom: '1px solid var(--border)', alignItems: 'center' }}>
             <div style={{ fontWeight: 600, fontSize: '.88rem' }}>
               {u.name}
               {u.id === currentUser?.sub && <span style={{ fontSize: '.68rem', color: 'var(--blue)', marginLeft: '.4rem' }}>(você)</span>}
@@ -514,12 +536,18 @@ function UsersPanel({ showToast, user: currentUser, session }) {
               <span className={`role-badge ${u.role}`}>{ROLE_LABEL[u.role] || u.role}</span>
             </div>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)' }}>{fmtDate(u.created_at)}</div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '.35rem' }}>
               {u.id !== currentUser?.sub && (
-                <button className="abtn r" style={{ fontSize: '.72rem' }} disabled={deleting === u.id}
-                  onClick={() => deleteUser(u)}>
-                  {deleting === u.id ? '…' : '🗑'}
-                </button>
+                <>
+                  <button className="abtn" style={{ fontSize: '.72rem' }} title="Resetar senha"
+                    onClick={() => { setResetSenha(''); setResetModal(u) }}>
+                    🔑
+                  </button>
+                  <button className="abtn r" style={{ fontSize: '.72rem' }} disabled={deleting === u.id}
+                    onClick={() => deleteUser(u)}>
+                    {deleting === u.id ? '…' : '🗑'}
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -579,6 +607,36 @@ function UsersPanel({ showToast, user: currentUser, session }) {
               <button className="btn-sec" onClick={() => setModal(false)}>Cancelar</button>
               <button className="btn-primary" onClick={createUser} disabled={saving}>
                 {saving ? 'Criando…' : '✓ Criar Usuário'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal resetar senha */}
+      {resetModal && (
+        <div className="overlay open" onClick={e => e.target.className === 'overlay open' && setResetModal(null)}>
+          <div className="modal" style={{ width: '400px' }}>
+            <div className="mhead">
+              <span className="mtitle">🔑 RESETAR SENHA — {resetModal.name.toUpperCase()}</span>
+              <button className="mclose" onClick={() => setResetModal(null)}>✕</button>
+            </div>
+            <div className="mbody">
+              <div style={{ marginBottom: '1rem', padding: '.75rem', background: 'var(--s2)', borderRadius: 'var(--radius-sm)', fontSize: '.78rem', color: 'var(--muted)' }}>
+                Defina uma senha temporária. O usuário <strong style={{ color: 'var(--text)' }}>deverá trocar a senha</strong> no próximo login.
+              </div>
+              <div className="fg full">
+                <label className="flabel">NOVA SENHA TEMPORÁRIA *</label>
+                <input className="finput" type="password" value={resetSenha} autoFocus
+                  onChange={e => setResetSenha(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && resetarSenha()}
+                  placeholder="Mínimo 6 caracteres" />
+              </div>
+            </div>
+            <div className="mfoot">
+              <button className="btn-sec" onClick={() => setResetModal(null)}>Cancelar</button>
+              <button className="btn-primary" onClick={resetarSenha} disabled={resetando}>
+                {resetando ? 'Salvando…' : '✓ Redefinir Senha'}
               </button>
             </div>
           </div>

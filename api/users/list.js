@@ -76,7 +76,10 @@ export default async function handler(req) {
     const { data: target } = await sbService.auth.admin.getUserById(user_id)
     if (target?.user?.user_metadata?.company_id !== company_id) return json({ error: 'Forbidden' }, 403)
 
-    const { error } = await sbService.auth.admin.updateUserById(user_id, { password })
+    const { error } = await sbService.auth.admin.updateUserById(user_id, {
+      password,
+      user_metadata: { ...target.user.user_metadata, must_change_password: true },
+    })
     if (error) return json({ error: error.message }, 500)
     return json({ ok: true })
   }
