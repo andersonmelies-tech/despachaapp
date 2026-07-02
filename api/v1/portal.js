@@ -15,10 +15,7 @@ export default async function handler(request) {
 
   const [{ data: co }, { data: cfg }] = await Promise.all([
     supabase.from('companies').select('invite_code, name').eq('id', company.id).single(),
-    supabase.from('config').select('key, value')
-      .eq('company_id', company.id)
-      .eq('key', 'brand_company_name')
-      .maybeSingle(),
+    supabase.from('config').select('value').eq('key', 'brand_company_name').maybeSingle(),
   ])
 
   if (!co?.invite_code) return err('invite_code não configurado para esta empresa', 404)
