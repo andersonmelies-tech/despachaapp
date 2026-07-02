@@ -53,8 +53,15 @@ function SetupPanel({ showToast }) {
 
   async function saveName() {
     setSaving(true)
-    await supabase.from('config').upsert({ key: 'company_name', value: cfg.company_name || '' })
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/company/config', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates: [{ key: 'company_name', value: cfg.company_name || '' }] }),
+    })
+    const d = await res.json().catch(() => ({}))
     setSaving(false)
+    if (!res.ok) return showToast('Erro ao salvar: ' + (d.error || res.statusText), 'err')
     showToast('Nome salvo ✓')
   }
 
@@ -839,14 +846,19 @@ function FiscalPanel({ showToast }) {
 
   async function save() {
     setSaving(true)
-    const upserts = FIELDS
+    const updates = FIELDS
       .filter(f => vals[f.key] !== undefined && vals[f.key] !== '')
       .map(f => ({ key: f.key, value: vals[f.key] }))
-    for (const u of upserts) {
-      await supabase.from('config').upsert(u)
-    }
-    showToast('Configurações fiscais salvas ✓')
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/company/config', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates }),
+    })
+    const d = await res.json().catch(() => ({}))
     setSaving(false)
+    if (!res.ok) return showToast('Erro ao salvar: ' + (d.error || res.statusText), 'err')
+    showToast('Configurações fiscais salvas ✓')
   }
 
   return (
