@@ -2,7 +2,7 @@ import { authenticate, ok, err, CORS_HEADERS } from './_auth.js'
 
 export const config = { runtime: 'edge' }
 
-const APP_URL = 'https://despachaapp.vercel.app'
+const APP_URL = 'https://despachaapp.com.br'
 
 export default async function handler(request) {
   if (request.method === 'OPTIONS') {
