@@ -47,12 +47,25 @@ export default async function handler(req) {
   const updates = Array.isArray(body.updates) ? body.updates : []
   const rows = updates
     .filter(u => u && typeof u.key === 'string' && u.key.trim())
-    .map(u => ({ key: u.key, value: u.value ?? '', company_id }))
+    .map(u => ({ key: u.key, value: u.value ?? '' }))
 
   if (!rows.length) return json({ error: 'Nenhuma configuração válida informada' }, 400)
 
-  const { error } = await sb.from('config').upsert(rows, { onConflict: 'key,company_id' })
-  if (error) return json({ error: error.message }, 500)
+  // UPDATE por key e, se não existir, INSERT — mesmo padrão do branding.
+  // (o banco não tem a constraint composta (key, company_id) para usar ON CONFLICT)
+  for (const row of rows) {
+    const { data, error: updErr } = await sb
+      .from('config')
+      .update({ value: row.value, company_id })
+      .eq('key', row.key)
+      .select('key')
+    if (updErr) return json({ error: updErr.message }, 500)
+
+    if (!data || data.length === 0) {
+      const { error: insErr } = await sb.from('config').insert({ key: row.key, value: row.value, company_id })
+      if (insErr) return json({ error: insErr.message }, 500)
+    }
+  }
 
   return json({ ok: true })
 }
