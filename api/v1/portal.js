@@ -13,19 +13,22 @@ export default async function handler(request) {
   if (auth instanceof Response) return auth
   const { company, supabase } = auth
 
-  const { data } = await supabase
-    .from('companies')
-    .select('invite_code, name')
-    .eq('id', company.id)
-    .single()
+  const [{ data: co }, { data: cfg }] = await Promise.all([
+    supabase.from('companies').select('invite_code, name').eq('id', company.id).single(),
+    supabase.from('config').select('key, value')
+      .eq('company_id', company.id)
+      .eq('key', 'brand_company_name')
+      .maybeSingle(),
+  ])
 
-  if (!data?.invite_code) return err('invite_code não configurado para esta empresa', 404)
+  if (!co?.invite_code) return err('invite_code não configurado para esta empresa', 404)
 
-  const portal_url = `${APP_URL}/portal?c=${data.invite_code}`
+  const portal_url   = `${APP_URL}/portal?c=${co.invite_code}`
+  const company_name = cfg?.value || co.name
 
   return ok({
-    invite_code: data.invite_code,
+    invite_code: co.invite_code,
     portal_url,
-    company_name: data.name,
+    company_name,
   })
 }
