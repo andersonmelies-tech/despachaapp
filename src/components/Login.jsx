@@ -43,8 +43,11 @@ export default function Login({ onLogin, showToast }) {
         <form onSubmit={handleLogin}>
           <div className="login-field">
             <label>USUÁRIO</label>
-            <input type="text" placeholder="seu.usuario" autoComplete="username"
+            <input type="text" placeholder="seu.usuario (sem @email)" autoComplete="username"
               value={username} onChange={e => setUsername(e.target.value)} autoFocus />
+            <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: '.25rem' }}>
+              Digite apenas o nome de usuário — não o e-mail da empresa
+            </div>
           </div>
           <div className="login-field">
             <label>SENHA</label>

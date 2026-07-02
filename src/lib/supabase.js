@@ -19,14 +19,16 @@ export async function getCompanyId() {
 }
 
 // ── Auth helpers ──────────────────────────────────────────────────────────────
-export const DOMAIN = '@despachaapp.app'
+export const DOMAIN = '@despachaapp.internal'
 
 export function toEmail(username) {
+  // Se contém @ é um e-mail real (dono de conta) — usa como está
+  // Senão é usuário interno criado pelo admin — adiciona domínio interno
   return username.includes('@') ? username : `${username.toLowerCase().trim()}${DOMAIN}`
 }
 
 export function fromEmail(email) {
-  return email?.replace(DOMAIN, '') ?? email
+  return email?.replace('@despachaapp.internal', '').replace('@despachaapp.app', '') ?? email
 }
 
 // ── SLA helpers ───────────────────────────────────────────────────────────────
