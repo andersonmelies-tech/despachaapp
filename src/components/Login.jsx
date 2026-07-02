@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { supabase, toEmail } from '../lib/supabase.js'
+import { supabase } from '../lib/supabase.js'
 import Register from './Register.jsx'
 
 export default function Login({ onLogin, showToast }) {
@@ -23,9 +23,21 @@ export default function Login({ onLogin, showToast }) {
     e.preventDefault()
     if (!username.trim() || !password) { setErr('Preencha usuário e senha'); return }
     setLoading(true); setErr('')
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: toEmail(username), password
-    })
+
+    // Extrai a parte local (antes do @, se houver) e monta o email interno
+    const localPart = username.toLowerCase().trim().split('@')[0]
+    const internalEmail = `${localPart}@despachaapp.internal`
+
+    // Tenta primeiro com email interno (usuários criados pelo admin)
+    let { data, error } = await supabase.auth.signInWithPassword({ email: internalEmail, password })
+
+    // Se falhou e o input parece um email real (tem @), tenta como email direto (donos de conta)
+    if (error && username.includes('@') && !username.endsWith('@despachaapp.internal')) {
+      const result = await supabase.auth.signInWithPassword({ email: username.trim(), password })
+      data  = result.data
+      error = result.error
+    }
+
     setLoading(false)
     if (error) { setErr('Usuário ou senha incorretos'); return }
     onLogin(data.session)
