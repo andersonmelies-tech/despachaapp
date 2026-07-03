@@ -395,6 +395,17 @@ export default function PublicRequestForm() {
             )}
           </div>
 
+          {/* Aviso sobre protocolo */}
+          <div style={styles.protocolWarning}>
+            <div style={{ fontSize: '1.1rem', marginBottom: '.3rem' }}>📋</div>
+            <div>
+              <strong>Guarde seu protocolo!</strong>
+              <div style={{ marginTop: '.25rem', lineHeight: 1.5 }}>
+                Após o envio você receberá um número de protocolo. Você poderá enviá-lo direto para o seu WhatsApp — mas <strong>se não salvar ou anotar, não será possível consultar nem acompanhar o andamento do seu atendimento.</strong>
+              </div>
+            </div>
+          </div>
+
           {/* Erro */}
           {error && (
             <div style={styles.errorBox}>⚠️ {error}</div>
@@ -535,6 +546,19 @@ const styles = {
     fontWeight: 600,
     color: '#374151',
     marginTop: '1rem',
+  },
+  protocolWarning: {
+    display: 'flex',
+    gap: '.65rem',
+    alignItems: 'flex-start',
+    background: '#fffbeb',
+    border: '1.5px solid #fcd34d',
+    borderRadius: 10,
+    padding: '.85rem 1rem',
+    fontSize: '.82rem',
+    color: '#92400e',
+    marginBottom: '.85rem',
+    lineHeight: 1.45,
   },
   errorBox: {
     background: '#fef2f2',
