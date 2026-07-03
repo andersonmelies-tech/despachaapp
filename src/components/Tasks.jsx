@@ -177,6 +177,7 @@ export default function Tasks({ showToast, sideFilter, user, plan, onStatsChange
   const fmtSP = d => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(d))
   const tarefasHoje = tasks.filter(t => {
     if (t.status === 'cancelada') return false
+    if (t.status === 'em_andamento') return true  // em andamento = sempre do dia
     const dueHoje = t.due_date?.slice(0, 10) === todayKey
     const slaHoje = t.sla_deadline ? fmtSP(t.sla_deadline) === todayKey : false
     return dueHoje || slaHoje
