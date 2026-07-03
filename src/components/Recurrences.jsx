@@ -50,6 +50,7 @@ function RecurrenceModal({ rec, providers, sectors, onClose, onSave, showToast }
     frequency:        rec?.frequency        || 'weekly',
     day_of_week:      rec?.day_of_week      ?? 5,
     day_of_month:     rec?.day_of_month     ?? 1,
+    skip_weekends:    rec?.skip_weekends    ?? null,  // null = usa padrão global
     dur:              0,   // apenas na criação
   })
   const [saving, setSaving] = useState(false)
@@ -92,6 +93,7 @@ function RecurrenceModal({ rec, providers, sectors, onClose, onSave, showToast }
       frequency:        f.frequency,
       day_of_week:      f.frequency === 'weekly'  ? Number(f.day_of_week)  : null,
       day_of_month:     f.frequency === 'monthly' ? Number(f.day_of_month) : null,
+      skip_weekends:    f.frequency === 'daily'   ? f.skip_weekends        : null,
       end_date,
     }
 
@@ -216,6 +218,30 @@ function RecurrenceModal({ rec, providers, sectors, onClose, onSave, showToast }
                   >{opt.l}</button>
                 ))}
               </div>
+
+              {/* Pular fins de semana (daily) */}
+              {f.frequency === 'daily' && (
+                <div style={{ marginBottom: '1rem', padding: '.75rem 1rem', background: 'var(--s2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '.75rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={f.skip_weekends !== false}
+                      onChange={e => set('skip_weekends', e.target.checked ? null : false)}
+                      style={{ width: 16, height: 16, accentColor: 'var(--navy)', cursor: 'pointer' }}
+                    />
+                    <div>
+                      <div style={{ fontSize: '.88rem', fontWeight: 600, color: 'var(--text)' }}>
+                        Pular fins de semana (Sáb e Dom)
+                      </div>
+                      <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginTop: '.1rem' }}>
+                        {f.skip_weekends !== false
+                          ? 'Seguirá o padrão definido nas Configurações da empresa'
+                          : 'Esta recorrência vai gerar tarefas também no Sáb e Dom'}
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              )}
 
               {/* Dia da semana (weekly) */}
               {f.frequency === 'weekly' && (

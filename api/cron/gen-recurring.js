@@ -31,7 +31,7 @@ function addDays(dateStr, n) {
 }
 
 /** Retorna lista de datas 'YYYY-MM-DD' que pertencem à regra no intervalo [from, to] */
-function getOccurrences(rec, from, to) {
+function getOccurrences(rec, from, to, skipWeekendsDefault = true) {
   const dates = []
 
   // Respeita start_date da regra
@@ -41,12 +41,20 @@ function getOccurrences(rec, from, to) {
 
   if (effectiveFrom > effectiveTo) return dates
 
+  // skip_weekends: campo da recorrência tem prioridade; se null usa padrão global
+  const skipWeekends = rec.skip_weekends !== null && rec.skip_weekends !== undefined
+    ? rec.skip_weekends
+    : skipWeekendsDefault
+
   let d = new Date(effectiveFrom + 'T00:00:00Z')
   const end = new Date(effectiveTo + 'T00:00:00Z')
 
   if (rec.frequency === 'daily') {
     while (d <= end) {
-      dates.push(d.toISOString().split('T')[0])
+      const dow = d.getUTCDay() // 0=Dom, 6=Sáb
+      if (!skipWeekends || (dow !== 0 && dow !== 6)) {
+        dates.push(d.toISOString().split('T')[0])
+      }
       d.setUTCDate(d.getUTCDate() + 1)
     }
 
@@ -101,6 +109,19 @@ export default async function handler(req) {
   const { data: recurrences, error: rErr } = await query
   if (rErr) return json({ error: rErr.message }, 500)
 
+  // Carrega config de "pular fins de semana" por company_id
+  const companyIds = [...new Set((recurrences || []).map(r => r.company_id).filter(Boolean))]
+  const configMap = {}
+  if (companyIds.length > 0) {
+    const { data: cfgRows } = await sb.from('config')
+      .select('value, company_id')
+      .eq('key', 'recurrence_skip_weekends')
+      .in('company_id', companyIds)
+    for (const row of cfgRows || []) {
+      configMap[row.company_id] = row.value === 'true' || row.value === true
+    }
+  }
+
   let totalGenerated = 0
   const results = []
 
@@ -109,7 +130,12 @@ export default async function handler(req) {
     const from = rec.last_generated ? addDays(rec.last_generated, 1) : today
     const to   = horizon
 
-    const dates = getOccurrences(rec, from, to)
+    // Padrão global da empresa (true = pular fds); se não configurado, padrão é true
+    const globalSkip = rec.company_id !== null && rec.company_id in configMap
+      ? configMap[rec.company_id]
+      : true
+
+    const dates = getOccurrences(rec, from, to, globalSkip)
     if (dates.length === 0) { results.push({ id: rec.id, generated: 0 }); continue }
 
     // Verifica quais já existem para evitar duplicatas

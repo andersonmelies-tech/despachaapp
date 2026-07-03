@@ -24,8 +24,9 @@ const TABS = [
   { id: 'sectors',   label: '🏢 Setores' },
   { id: 'users',     label: '👥 Usuários' },
   { id: 'api',       label: '🔌 API / ERP' },
-  { id: 'branding',  label: '🎨 White-label' },
-  { id: 'fiscal',    label: '🧾 Fiscal / NFS-e' },
+  { id: 'branding',      label: '🎨 White-label' },
+  { id: 'fiscal',        label: '🧾 Fiscal / NFS-e' },
+  { id: 'recorrencias',  label: '🔁 Recorrências' },
 ]
 
 // ── Setup — modelo de bot centralizado ───────────────────────────────────────
@@ -969,6 +970,90 @@ function FiscalPanel({ showToast }) {
   )
 }
 
+// ── Recorrências ──────────────────────────────────────────────────────────────
+function RecorrenciasPanel({ showToast }) {
+  const [skipWeekends, setSkipWeekends] = useState(true)
+  const [loading, setLoading]           = useState(true)
+  const [saving, setSaving]             = useState(false)
+
+  useEffect(() => {
+    supabase.from('config')
+      .select('value')
+      .eq('key', 'recurrence_skip_weekends')
+      .maybeSingle()
+      .then(({ data }) => {
+        // Se nunca configurado, padrão é true (pular fds)
+        setSkipWeekends(data ? (data.value === 'true' || data.value === true) : true)
+        setLoading(false)
+      })
+  }, [])
+
+  async function save() {
+    setSaving(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/company/config', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates: [{ key: 'recurrence_skip_weekends', value: String(skipWeekends) }] }),
+    })
+    setSaving(false)
+    if (!res.ok) { showToast('Erro ao salvar', 'err'); return }
+    showToast('Configuração de recorrências salva ✓')
+  }
+
+  if (loading) return <div style={{ padding: '2rem', color: 'var(--muted)' }}>Carregando…</div>
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: 560 }}>
+      <div>
+        <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text)', marginBottom: '.25rem' }}>
+          Tarefas recorrentes diárias
+        </div>
+        <div style={{ fontSize: '.82rem', color: 'var(--muted)', marginBottom: '1.25rem' }}>
+          Defina o comportamento padrão para tarefas com recorrência diária. Recorrências individuais podem sobrescrever este padrão.
+        </div>
+
+        <div
+          style={{
+            background: 'var(--s2)',
+            border: '1px solid var(--border)',
+            borderRadius: 10,
+            padding: '1.25rem 1.5rem',
+          }}
+        >
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={skipWeekends}
+              onChange={e => setSkipWeekends(e.target.checked)}
+              style={{ width: 18, height: 18, marginTop: 2, accentColor: 'var(--navy)', cursor: 'pointer', flexShrink: 0 }}
+            />
+            <div>
+              <div style={{ fontWeight: 600, fontSize: '.9rem', color: 'var(--text)' }}>
+                Pular Sábados e Domingos
+              </div>
+              <div style={{ fontSize: '.78rem', color: 'var(--muted)', marginTop: '.3rem', lineHeight: 1.5 }}>
+                {skipWeekends
+                  ? 'Ativado — tarefas diárias não serão geradas nos fins de semana.'
+                  : 'Desativado — tarefas diárias serão geradas todos os dias, incluindo Sáb e Dom.'}
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <div style={{ fontSize: '.75rem', color: 'var(--dim)', marginTop: '.75rem', lineHeight: 1.5 }}>
+          Empresas que trabalham nos fins de semana devem desativar esta opção.
+          Cada recorrência individual também pode ter uma configuração própria que prevalece sobre este padrão.
+        </div>
+      </div>
+
+      <button className="btn-primary" style={{ alignSelf: 'flex-start' }} onClick={save} disabled={saving}>
+        {saving ? 'Salvando…' : '💾 Salvar Configuração'}
+      </button>
+    </div>
+  )
+}
+
 // ── Settings (main) ────────────────────────────────────────────────────────
 export default function Settings({ showToast, user, session }) {
   const [tab, setTab] = useState('setup')
@@ -989,7 +1074,8 @@ export default function Settings({ showToast, user, session }) {
       {tab === 'users'     && <UsersPanel      showToast={showToast} user={user} session={session} />}
       {tab === 'api'       && <ApiDocs         showToast={showToast} />}
       {tab === 'branding'  && <BrandingPanel   showToast={showToast} session={session} />}
-      {tab === 'fiscal'    && <FiscalPanel     showToast={showToast} />}
+      {tab === 'fiscal'       && <FiscalPanel        showToast={showToast} />}
+      {tab === 'recorrencias' && <RecorrenciasPanel  showToast={showToast} />}
     </div>
   )
 }
