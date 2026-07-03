@@ -190,7 +190,13 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
     }
 
     if (isEdit) {
-      if (f.status === 'em_andamento' && !task.started_at) payload.started_at = now.toISOString()
+      // Primeira aprovação (pendente → em_andamento): SLA e prazo contam a partir de agora
+      if (f.status === 'em_andamento' && task.status !== 'em_andamento') {
+        payload.started_at   = now.toISOString()
+        const newSla         = calcSlaDeadline(f.urgency, now)
+        payload.sla_deadline = newSla
+        payload.due_date     = newSla.split('T')[0]
+      }
       if (f.status === 'concluida' && !task.completed_at) {
         payload.completed_at = now.toISOString()
         if (task.started_at) payload.elapsed_minutes = Math.round((now - new Date(task.started_at)) / 60000)

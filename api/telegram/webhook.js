@@ -220,8 +220,15 @@ async function updateTask(taskId, chatId, fields) {
   const now = new Date().toISOString()
   const updates = { ...fields }
   if (fields.status) {
-    if (fields.status === 'em_andamento' && !existing.started_at)
+    if (fields.status === 'em_andamento' && !existing.started_at) {
       updates.started_at = now
+      // SLA e prazo contam a partir do momento em que o colaborador inicia
+      const SLA_H = { critica: 2, alta: 8, media: 24, baixa: 72 }
+      const hours = SLA_H[existing.urgency] ?? 24
+      const newSla = new Date(Date.now() + hours * 3600000).toISOString()
+      updates.sla_deadline = newSla
+      updates.due_date     = newSla.split('T')[0]
+    }
     if (fields.status === 'concluida') {
       updates.completed_at = now
       if (existing.started_at) {

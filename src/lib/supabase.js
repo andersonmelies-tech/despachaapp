@@ -52,7 +52,7 @@ export function isOverdue(task) {
 // ── Stat query ────────────────────────────────────────────────────────────────
 // Seleciona APENAS as colunas necessárias para o cálculo — evita baixar
 // photos (base64), description, requester_phone, etc.
-const STATS_COLS = 'id,status,urgency,due_date,sla_deadline,elapsed_minutes,assignee_id,sector'
+const STATS_COLS = 'id,status,urgency,due_date,sla_deadline,elapsed_minutes,assignee_id,sector,recurrence_id'
 const STATS_CACHE_KEY = 'dsp_stats_cache'
 
 // Lê cache do sessionStorage (dura enquanto a aba está aberta)
@@ -71,22 +71,27 @@ export async function fetchStats() {
   ])
   if (!tasks) return null
 
-  const total      = tasks.length
-  const pendente   = tasks.filter(t => t.status === 'pendente').length
-  const em_and     = tasks.filter(t => t.status === 'em_andamento').length
-  const concluida  = tasks.filter(t => t.status === 'concluida').length
-  const cancelada  = tasks.filter(t => t.status === 'cancelada').length
-  const atrasadas  = tasks.filter(t => isOverdue(t)).length
-  const criticas   = tasks.filter(t => t.urgency === 'critica' && !['concluida','cancelada'].includes(t.status)).length
+  // Recorrentes futuras (due_date > hoje) não devem ser contabilizadas
+  // — são geradas 60 dias à frente mas só existem "de verdade" no dia de uso
+  const today = new Date().toISOString().split('T')[0]
+  const tasks$ = tasks.filter(t => !t.recurrence_id || !t.due_date || t.due_date <= today)
 
-  const finished = tasks.filter(t => t.elapsed_minutes)
+  const total      = tasks$.length
+  const pendente   = tasks$.filter(t => t.status === 'pendente').length
+  const em_and     = tasks$.filter(t => t.status === 'em_andamento').length
+  const concluida  = tasks$.filter(t => t.status === 'concluida').length
+  const cancelada  = tasks$.filter(t => t.status === 'cancelada').length
+  const atrasadas  = tasks$.filter(t => isOverdue(t)).length
+  const criticas   = tasks$.filter(t => t.urgency === 'critica' && !['concluida','cancelada'].includes(t.status)).length
+
+  const finished = tasks$.filter(t => t.elapsed_minutes)
   const avg_minutes = finished.length
     ? Math.round(finished.reduce((a, t) => a + t.elapsed_minutes, 0) / finished.length)
     : 0
 
   // Por prestador
   const por_prestador = (provs || []).map(p => {
-    const pt = tasks.filter(t => t.assignee_id === p.id)
+    const pt = tasks$.filter(t => t.assignee_id === p.id)
     const pf = pt.filter(t => t.elapsed_minutes)
     return {
       assignee: p.name,
@@ -101,7 +106,7 @@ export async function fetchStats() {
 
   // Por setor
   const setorMap = {}
-  tasks.forEach(t => {
+  tasks$.forEach(t => {
     if (!t.sector) return
     if (!setorMap[t.sector]) setorMap[t.sector] = { sector: t.sector, total: 0, concluidas: 0, abertas: 0 }
     setorMap[t.sector].total++
