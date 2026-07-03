@@ -42,9 +42,11 @@ export function calcSlaDeadline(urgency, fromDate = new Date()) {
 }
 
 export function isOverdue(task) {
-  if (['concluida', 'cancelada'].includes(task.status)) return false
+  if (['concluida', 'cancelada', 'pendente'].includes(task.status)) return false
   const now = new Date()
-  const due = task.due_date ? new Date(task.due_date) : null
+  // T23:59:59 evita que o parse UTC desloque a data -3h (Brazil), tornando
+  // tarefas com due_date=hoje já atrasadas desde às 21h de ontem
+  const due = task.due_date ? new Date(task.due_date + 'T23:59:59') : null
   const sla = task.sla_deadline ? new Date(task.sla_deadline) : null
   return (due && due < now) || (sla && sla < now)
 }
