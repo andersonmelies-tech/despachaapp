@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { supabase, calcSlaDeadline, isOverdue } from '../lib/supabase.js'
+import { supabase, calcSlaDeadline, isoToLocalDate, isOverdue } from '../lib/supabase.js'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 export const URG_LABEL = { critica: '🚨 Crítica', alta: '🔴 Alta', media: '🟡 Média', baixa: '🟢 Baixa' }
@@ -195,7 +195,7 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
         payload.started_at   = now.toISOString()
         const newSla         = calcSlaDeadline(f.urgency, now)
         payload.sla_deadline = newSla
-        payload.due_date     = newSla.split('T')[0]
+        payload.due_date     = isoToLocalDate(newSla)  // data no fuso SP, não UTC
       }
       if (f.status === 'concluida' && !task.completed_at) {
         payload.completed_at = now.toISOString()

@@ -172,9 +172,15 @@ export default function Tasks({ showToast, sideFilter, user, plan, onStatsChange
 
   const list = filtered()
 
-  // Tarefas com prazo hoje (due_date = hoje no fuso local)
+  // Tarefas com prazo hoje — due_date OU sla_deadline caindo no dia corrente (fuso SP)
   const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
-  const tarefasHoje = tasks.filter(t => t.due_date === todayKey && t.status !== 'cancelada')
+  const fmtSP = d => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(d))
+  const tarefasHoje = tasks.filter(t => {
+    if (t.status === 'cancelada') return false
+    const dueHoje = t.due_date?.slice(0, 10) === todayKey
+    const slaHoje = t.sla_deadline ? fmtSP(t.sla_deadline) === todayKey : false
+    return dueHoje || slaHoje
+  })
   const hojeFeitas  = tarefasHoje.filter(t => t.status === 'concluida')
   const hojePendentes = tarefasHoje.filter(t => t.status !== 'concluida')
 

@@ -227,7 +227,9 @@ async function updateTask(taskId, chatId, fields) {
       const hours = SLA_H[existing.urgency] ?? 24
       const newSla = new Date(Date.now() + hours * 3600000).toISOString()
       updates.sla_deadline = newSla
-      updates.due_date     = newSla.split('T')[0]
+      // Usa fuso SP para não gravar data UTC do dia seguinte em aprovações vespertinas
+      const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' })
+      updates.due_date = fmt.format(new Date(newSla))
     }
     if (fields.status === 'concluida') {
       updates.completed_at = now

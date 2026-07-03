@@ -41,6 +41,11 @@ export function calcSlaDeadline(urgency, fromDate = new Date()) {
   return d.toISOString()
 }
 
+// Retorna 'YYYY-MM-DD' no fuso America/Sao_Paulo para uma string ISO
+export function isoToLocalDate(iso) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(iso))
+}
+
 export function isOverdue(task) {
   if (['concluida', 'cancelada', 'pendente'].includes(task.status)) return false
   const now = new Date()
