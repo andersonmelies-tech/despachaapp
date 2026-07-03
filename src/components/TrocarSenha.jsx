@@ -27,18 +27,17 @@ export default function TrocarSenha({ onConcluido }) {
 
   return (
     <div className="login-overlay">
-      <div className="login-box">
+      <div className="login-center">
         <div className="login-logo">
-          <div className="login-logo-wrap">
-            <img src="/logo.png" alt="DespachaApp" className="login-logo-img" />
-          </div>
+          <img src="/logo.png" alt="DespachaApp" className="login-logo-img" />
         </div>
 
+      <div className="login-box">
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)', marginBottom: '.25rem' }}>
+          <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)', marginBottom: '.25rem' }}>
             Troca de senha obrigatória
           </div>
-          <div style={{ fontSize: '.8rem', color: 'var(--muted)' }}>
+          <div style={{ fontSize: '.82rem', color: 'var(--muted)' }}>
             Defina uma nova senha para continuar
           </div>
         </div>
@@ -70,6 +69,7 @@ export default function TrocarSenha({ onConcluido }) {
           </button>
           <div className="login-err">{err}</div>
         </form>
+      </div>
       </div>
     </div>
   )
