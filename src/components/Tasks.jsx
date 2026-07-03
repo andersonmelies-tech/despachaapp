@@ -172,8 +172,75 @@ export default function Tasks({ showToast, sideFilter, user, plan, onStatsChange
 
   const list = filtered()
 
+  // Tarefas com prazo hoje (due_date = hoje no fuso local)
+  const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
+  const tarefasHoje = tasks.filter(t => t.due_date === todayKey && t.status !== 'cancelada')
+  const hojeFeitas  = tarefasHoje.filter(t => t.status === 'concluida')
+  const hojePendentes = tarefasHoje.filter(t => t.status !== 'concluida')
+
   return (
     <div>
+      {/* ── Box: Tarefas do dia ── */}
+      {tarefasHoje.length > 0 && (
+        <div style={{
+          background: 'var(--s1)', border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+          padding: '1rem 1.25rem', marginBottom: '1rem',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.75rem' }}>
+            <span style={{ fontWeight: 700, fontSize: '.85rem', color: 'var(--text)' }}>
+              📅 Tarefas do dia — prazo hoje
+            </span>
+            <div style={{ display: 'flex', gap: '.5rem' }}>
+              <span style={{ fontSize: '.75rem', fontWeight: 600, padding: '2px 10px', borderRadius: 20,
+                background: hojePendentes.length > 0 ? '#fef3c7' : '#dcfce7',
+                color: hojePendentes.length > 0 ? '#92400e' : '#166534' }}>
+                {hojePendentes.length} pendente{hojePendentes.length !== 1 ? 's' : ''}
+              </span>
+              <span style={{ fontSize: '.75rem', fontWeight: 600, padding: '2px 10px', borderRadius: 20,
+                background: '#dcfce7', color: '#166534' }}>
+                {hojeFeitas.length} concluída{hojeFeitas.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+
+          {/* Barra de progresso geral */}
+          <div style={{ height: 6, background: 'var(--border)', borderRadius: 4, marginBottom: '.85rem', overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', borderRadius: 4, transition: 'width .4s',
+              background: hojeFeitas.length === tarefasHoje.length ? 'var(--green)' : 'var(--blue)',
+              width: `${Math.round((hojeFeitas.length / tarefasHoje.length) * 100)}%`,
+            }} />
+          </div>
+
+          {/* Linhas */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+            {tarefasHoje
+              .sort((a, b) => (a.status === 'concluida' ? 1 : -1) || a.id - b.id)
+              .map(t => (
+                <div key={t.id} onClick={() => setDetailTask(t)} style={{
+                  display: 'flex', alignItems: 'center', gap: '.65rem',
+                  padding: '.45rem .75rem', borderRadius: 6, cursor: 'pointer',
+                  background: t.status === 'concluida' ? 'var(--s2)' : isOverdue(t) ? '#fef2f2' : 'var(--s2)',
+                  border: `1px solid ${t.status === 'concluida' ? 'var(--border)' : isOverdue(t) ? '#fca5a5' : 'var(--border)'}`,
+                  opacity: t.status === 'concluida' ? .65 : 1,
+                }}>
+                  <span style={{ fontSize: '.8rem', flexShrink: 0 }}>
+                    {t.status === 'concluida' ? '✅' : t.status === 'em_andamento' ? '⚡' : '⏳'}
+                  </span>
+                  <span style={{ flex: 1, fontSize: '.83rem', fontWeight: 500, color: 'var(--text)',
+                    textDecoration: t.status === 'concluida' ? 'line-through' : 'none' }}>
+                    #{t.id} {t.title}
+                  </span>
+                  <span style={{ fontSize: '.75rem', color: 'var(--muted)', flexShrink: 0 }}>{t.assignee}</span>
+                  <span style={{ fontSize: '.72rem', flexShrink: 0 }}>
+                    <span className={`ubadge ${t.urgency}`}>{URG_LABEL[t.urgency]}</span>
+                  </span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
       {/* Controles */}
       <div className="ctrl-row">
         <div className="search-wrap">
