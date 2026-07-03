@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase.js'
 
-const FREQ_LABEL = { daily: '📆 Diária', weekly: '📅 Semanal', monthly: '🗓 Mensal' }
+const FREQ_LABEL = { daily: '📆 Diária', weekly: '📅 Semanal', weekly_custom: '📅 Dias Fixos', monthly: '🗓 Mensal' }
 const DOW_LABEL  = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 const URG_LABEL  = { critica: '🚨 Crítica', alta: '🔴 Alta', media: '🟡 Média', baixa: '🟢 Baixa' }
 const DUR_OPTS   = [
@@ -28,9 +28,13 @@ function fmtDate(d) {
 }
 
 function freqDesc(rec) {
-  if (rec.frequency === 'daily')   return 'Todos os dias'
-  if (rec.frequency === 'weekly')  return `Toda ${DOW_LABEL[rec.day_of_week ?? 5]}`
-  if (rec.frequency === 'monthly') return `Todo dia ${rec.day_of_month ?? 1} do mês`
+  if (rec.frequency === 'daily')         return 'Todos os dias'
+  if (rec.frequency === 'weekly')        return `Toda ${DOW_LABEL[rec.day_of_week ?? 5]}`
+  if (rec.frequency === 'weekly_custom') {
+    const dias = (rec.days_of_week || []).sort((a, b) => a - b).map(d => DOW_LABEL[d]).join(', ')
+    return dias ? `Toda semana: ${dias}` : 'Dias não configurados'
+  }
+  if (rec.frequency === 'monthly')       return `Todo dia ${rec.day_of_month ?? 1} do mês`
   return '—'
 }
 
@@ -49,6 +53,7 @@ function RecurrenceModal({ rec, providers, sectors, onClose, onSave, showToast }
     sector:           rec?.sector           || '',
     frequency:        rec?.frequency        || 'weekly',
     day_of_week:      rec?.day_of_week      ?? 5,
+    days_of_week:     rec?.days_of_week     || [],
     day_of_month:     rec?.day_of_month     ?? 1,
     skip_weekends:    rec?.skip_weekends    ?? null,  // null = usa padrão global
     dur:              0,   // apenas na criação
@@ -56,6 +61,12 @@ function RecurrenceModal({ rec, providers, sectors, onClose, onSave, showToast }
   const [saving, setSaving] = useState(false)
 
   function set(k, v) { setF(p => ({ ...p, [k]: v })) }
+  function toggleDay(d) {
+    setF(p => {
+      const arr = p.days_of_week || []
+      return { ...p, days_of_week: arr.includes(d) ? arr.filter(x => x !== d) : [...arr, d] }
+    })
+  }
 
   function selectProvider(id) {
     const p = providers.find(p => p.id === Number(id))
@@ -66,6 +77,8 @@ function RecurrenceModal({ rec, providers, sectors, onClose, onSave, showToast }
     if (!f.title.trim())    return showToast('Título obrigatório', 'err')
     if (!f.requester.trim()) return showToast('Solicitante obrigatório', 'err')
     if (!f.assignee.trim()) return showToast('Colaborador obrigatório', 'err')
+    if (f.frequency === 'weekly_custom' && f.days_of_week.length === 0)
+      return showToast('Selecione pelo menos um dia da semana', 'err')
     setSaving(true)
 
     // Calcula end_date pela duração escolhida
@@ -91,9 +104,10 @@ function RecurrenceModal({ rec, providers, sectors, onClose, onSave, showToast }
       category:         f.category || null,
       sector:           f.sector   || null,
       frequency:        f.frequency,
-      day_of_week:      f.frequency === 'weekly'  ? Number(f.day_of_week)  : null,
-      day_of_month:     f.frequency === 'monthly' ? Number(f.day_of_month) : null,
-      skip_weekends:    f.frequency === 'daily'   ? f.skip_weekends        : null,
+      day_of_week:      f.frequency === 'weekly'        ? Number(f.day_of_week)  : null,
+      days_of_week:     f.frequency === 'weekly_custom' ? f.days_of_week          : null,
+      day_of_month:     f.frequency === 'monthly'       ? Number(f.day_of_month)  : null,
+      skip_weekends:    f.frequency === 'daily'         ? f.skip_weekends         : null,
       end_date,
     }
 
@@ -197,11 +211,12 @@ function RecurrenceModal({ rec, providers, sectors, onClose, onSave, showToast }
 
               {/* Frequência */}
               <label className="flabel">FREQUÊNCIA</label>
-              <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
                 {[
-                  { v: 'daily',   l: '📆 Diária'  },
-                  { v: 'weekly',  l: '📅 Semanal'  },
-                  { v: 'monthly', l: '🗓 Mensal'   },
+                  { v: 'daily',         l: '📆 Diária'     },
+                  { v: 'weekly',        l: '📅 Semanal'    },
+                  { v: 'weekly_custom', l: '📅 Dias Fixos' },
+                  { v: 'monthly',       l: '🗓 Mensal'     },
                 ].map(opt => (
                   <button
                     key={opt.v}
@@ -264,6 +279,38 @@ function RecurrenceModal({ rec, providers, sectors, onClose, onSave, showToast }
                       >{d.label}</button>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Dias fixos da semana (weekly_custom — múltiplos dias) */}
+              {f.frequency === 'weekly_custom' && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <label className="flabel">DIAS DA SEMANA (selecione um ou mais)</label>
+                  <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap', marginBottom: '.5rem' }}>
+                    {DOW_OPTS.map(d => {
+                      const sel = (f.days_of_week || []).includes(d.value)
+                      return (
+                        <button
+                          key={d.value}
+                          type="button"
+                          onClick={() => toggleDay(d.value)}
+                          style={{
+                            padding: '.45rem .85rem', borderRadius: 8, border: '1.5px solid',
+                            borderColor: sel ? 'var(--blue)' : 'var(--border)',
+                            background:  sel ? '#3B82F615' : 'var(--s2)',
+                            color:       sel ? 'var(--blue)' : 'var(--text)',
+                            fontWeight:  sel ? 700 : 400,
+                            cursor: 'pointer', fontSize: '.82rem', transition: 'all .15s',
+                          }}
+                        >{d.label}</button>
+                      )
+                    })}
+                  </div>
+                  {f.days_of_week.length > 0 && (
+                    <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>
+                      Gerará tarefas toda semana nas: {f.days_of_week.sort((a,b)=>a-b).map(d => DOW_LABEL[d]).join(', ')}
+                    </div>
+                  )}
                 </div>
               )}
 

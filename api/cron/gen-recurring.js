@@ -67,6 +67,15 @@ function getOccurrences(rec, from, to, skipWeekendsDefault = true) {
       d.setUTCDate(d.getUTCDate() + 7)
     }
 
+  } else if (rec.frequency === 'weekly_custom') {
+    const allowedDays = new Set(rec.days_of_week || [])
+    while (d <= end) {
+      if (allowedDays.has(d.getUTCDay())) {
+        dates.push(d.toISOString().split('T')[0])
+      }
+      d.setUTCDate(d.getUTCDate() + 1)
+    }
+
   } else if (rec.frequency === 'monthly') {
     const dom = Math.min(rec.day_of_month ?? 1, 28)
     // Primeiro mês que contenha uma data >= effectiveFrom
