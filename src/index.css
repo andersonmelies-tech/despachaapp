@@ -181,8 +181,8 @@ select:focus { border-color: var(--blue); }
 
 /* ── TABLE ────────────────────────────────────────────── */
 .tbl-wrap { background: var(--s1); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-.tbl-head { display: grid; grid-template-columns: 52px 1fr 130px 115px 100px 115px 110px; padding: .6rem 1rem; border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: .63rem; color: var(--dim); letter-spacing: .1em; background: var(--s2); text-transform: uppercase; }
-.trow { display: grid; grid-template-columns: 52px 1fr 130px 115px 100px 115px 110px; padding: .8rem 1rem; border-bottom: 1px solid var(--border); align-items: center; transition: background .12s; cursor: pointer; }
+.tbl-head { display: grid; grid-template-columns: 52px 1fr 130px 115px 100px 95px 95px 110px; padding: .6rem 1rem; border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: .63rem; color: var(--dim); letter-spacing: .1em; background: var(--s2); text-transform: uppercase; }
+.trow { display: grid; grid-template-columns: 52px 1fr 130px 115px 100px 95px 95px 110px; padding: .8rem 1rem; border-bottom: 1px solid var(--border); align-items: center; transition: background .12s; cursor: pointer; }
 .trow:last-child { border-bottom: none; }
 .trow:hover { background: var(--s2); }
 .trow.is-late { border-left: 3px solid var(--red); }

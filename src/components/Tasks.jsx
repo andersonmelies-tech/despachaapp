@@ -154,10 +154,13 @@ export default function Tasks({ showToast, sideFilter, user, plan, onStatsChange
         t.assignee.toLowerCase().includes(q)
       )
     }
-    return list.sort((a, b) => {
-      const ord = { critica: 0, alta: 1, media: 2, baixa: 3 }
-      return (ord[a.urgency] ?? 4) - (ord[b.urgency] ?? 4) || b.id - a.id
-    })
+    const statusOrd = { em_andamento: 0, pendente: 1, cancelada: 2, concluida: 3 }
+    const urgOrd    = { critica: 0, alta: 1, media: 2, baixa: 3 }
+    return list.sort((a, b) =>
+      (statusOrd[a.status] ?? 4) - (statusOrd[b.status] ?? 4) ||
+      (urgOrd[a.urgency]   ?? 4) - (urgOrd[b.urgency]   ?? 4) ||
+      b.id - a.id
+    )
   }
 
   async function deleteTask(id) {
@@ -200,7 +203,7 @@ export default function Tasks({ showToast, sideFilter, user, plan, onStatsChange
       <div className="tbl-wrap">
         <div className="tbl-head">
           <span>#</span><span>Tarefa</span><span>Colaborador</span>
-          <span>Urgência</span><span>Status</span><span>Prazo</span><span>Ações</span>
+          <span>Urgência</span><span>Status</span><span>Solicitação</span><span>Prazo</span><span>Ações</span>
         </div>
         {loading ? (
           <div className="empty">Carregando…</div>
@@ -237,6 +240,7 @@ export default function Tasks({ showToast, sideFilter, user, plan, onStatsChange
                   </div>
                 )}
               </span>
+              <span className="tdue ok" style={{ color: 'var(--muted)', fontSize: '.8rem' }}>{fmtDate(t.created_at)}</span>
               <span className={`tdue ${late && isActive ? 'late' : 'ok'}`}>{fmtDate(t.due_date)}</span>
               <span className="actions" onClick={e => e.stopPropagation()}>
                 <button className="abtn b" onClick={() => setDetailTask(t)}>👁</button>
