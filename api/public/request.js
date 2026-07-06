@@ -57,7 +57,9 @@ export default async function handler(req) {
   const sla_deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
   const due_date     = sla_deadline.split('T')[0]
 
-  // Insere tarefa sem fotos primeiro (para ter o ID)
+  // Fotos: salva base64 diretamente no banco (igual ao modal admin)
+  const photosJson = photos?.length ? JSON.stringify(photos.slice(0, 3)) : null
+
   const { data: task, error } = await sb.from('tasks').insert({
     title,
     description:       description.trim(),
@@ -74,45 +76,13 @@ export default async function handler(req) {
     needs_approval:    true,
     provider_notified: false,
     company_id,
-    assignee: 'A definir',
+    assignee:          'A definir',
+    photos:            photosJson,
   }).select('id').single()
 
   if (error) {
     console.error('[public/request]', error)
     return json({ error: error.message }, 500)
-  }
-
-  // Faz upload das fotos para o Supabase Storage e guarda as URLs
-  if (photos?.length) {
-    try {
-      const urls = await Promise.all(
-        photos.slice(0, 3).map(async (base64, i) => {
-          // base64 = "data:image/jpeg;base64,XXXX..."
-          const match = base64.match(/^data:([^;]+);base64,(.+)$/)
-          if (!match) return null
-          const [, mime, data] = match
-          const ext  = mime.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg'
-          const path = `${task.id}/${i}.${ext}`
-          // Decodifica base64 → Uint8Array
-          const binary = atob(data)
-          const bytes  = new Uint8Array(binary.length)
-          for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j)
-          const { error: upErr } = await sb.storage
-            .from('task-photos')
-            .upload(path, bytes, { contentType: mime, upsert: true })
-          if (upErr) { console.error('[upload]', upErr.message); return null }
-          const { data: { publicUrl } } = sb.storage.from('task-photos').getPublicUrl(path)
-          return publicUrl
-        })
-      )
-      const validUrls = urls.filter(Boolean)
-      if (validUrls.length) {
-        await sb.from('tasks').update({ photos: JSON.stringify(validUrls) }).eq('id', task.id)
-      }
-    } catch (upErr) {
-      console.error('[public/request] photo upload failed', upErr)
-      // Continua mesmo sem fotos — não bloqueia a criação da tarefa
-    }
   }
 
   return json({ ok: true, protocol: task.id })

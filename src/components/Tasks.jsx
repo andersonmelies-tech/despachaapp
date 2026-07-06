@@ -104,7 +104,7 @@ export default function Tasks({ showToast, sideFilter, user, plan, onStatsChange
 
     // Seleciona só as colunas necessárias para a LISTA — photos/description/notes
     // são carregadas sob demanda quando o usuário abre o detalhe da tarefa
-    const LIST_COLS = 'id,title,status,urgency,due_date,sla_deadline,created_at,assignee,assignee_id,sector,source,needs_approval,requester,requester_phone,elapsed_minutes,recurrence_id,provider_new_date,company_id'
+    const LIST_COLS = 'id,title,status,urgency,due_date,sla_deadline,created_at,assignee,assignee_id,sector,source,needs_approval,requester,requester_phone,requester_sector,elapsed_minutes,recurrence_id,provider_new_date,company_id'
     const [tr, pr, sr, slr] = await Promise.all([
       supabase.from('tasks').select(LIST_COLS).order('id', { ascending: false }),
       supabase.from('providers').select('id,name,chat_id,active').eq('active', 1),
