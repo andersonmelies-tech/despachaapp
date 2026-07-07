@@ -5,52 +5,54 @@
  */
 import { useState, useRef, useEffect } from 'react'
 
-// Lê arquivo como base64 via FileReader (fallback confiável)
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload  = e => resolve(e.target.result)
-    reader.onerror = () => reject(new Error('FileReader falhou'))
-    reader.readAsDataURL(file)
-  })
-}
-
-// Comprime imagem via canvas; se canvas falhar (mobile, HEIC, tela bloqueada) usa FileReader
+// Comprime imagem — 3 estratégias em cascata para máxima compatibilidade mobile
 async function compressImage(file, maxPx = 800, quality = 0.65) {
-  return new Promise(resolve => {
+  const isValid = r => r && r !== 'data:,' && r.length > 100
+
+  // Estratégia 1: createImageBitmap (mais confiável, lida com EXIF/HEIC)
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const bmp = await createImageBitmap(file)
+      const s = Math.min(1, maxPx / Math.max(bmp.width, bmp.height))
+      const w = Math.ceil(bmp.width * s), h = Math.ceil(bmp.height * s)
+      const cv = document.createElement('canvas')
+      cv.width = w; cv.height = h
+      cv.getContext('2d').drawImage(bmp, 0, 0, w, h)
+      bmp.close()
+      const r = cv.toDataURL('image/jpeg', quality)
+      if (isValid(r)) return r
+    } catch {}
+  }
+
+  // Estratégia 2: blob URL + img.decode (decode garante pixel data disponível)
+  const blobUrl = URL.createObjectURL(file)
+  try {
     const img = new Image()
-    const url = URL.createObjectURL(file)
-
-    img.onload = () => {
-      URL.revokeObjectURL(url)
-      try {
-        const scale = Math.min(1, maxPx / Math.max(img.width || 1, img.height || 1))
-        const w = Math.round((img.width  || 0) * scale)
-        const h = Math.round((img.height || 0) * scale)
-        if (!w || !h) { fileToBase64(file).then(resolve).catch(() => resolve(null)); return }
-        const canvas = document.createElement('canvas')
-        canvas.width = w; canvas.height = h
-        const ctx = canvas.getContext('2d')
-        if (!ctx) { fileToBase64(file).then(resolve).catch(() => resolve(null)); return }
-        ctx.drawImage(img, 0, 0, w, h)
-        const result = canvas.toDataURL('image/jpeg', quality)
-        // 'data:,' = canvas vazio (falhou) — usa FileReader
-        if (!result || result.length < 50 || result === 'data:,') {
-          fileToBase64(file).then(resolve).catch(() => resolve(null))
-          return
-        }
-        resolve(result)
-      } catch {
-        fileToBase64(file).then(resolve).catch(() => resolve(null))
-      }
+    img.src = blobUrl
+    await (img.decode ? img.decode() : new Promise((res, rej) => { img.onload = res; img.onerror = rej }))
+    URL.revokeObjectURL(blobUrl)
+    const W = img.naturalWidth || img.width || 0
+    const H = img.naturalHeight || img.height || 0
+    if (W > 0 && H > 0) {
+      const s = Math.min(1, maxPx / Math.max(W, H))
+      const cv = document.createElement('canvas')
+      cv.width = Math.ceil(W * s); cv.height = Math.ceil(H * s)
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height)
+      const r = cv.toDataURL('image/jpeg', quality)
+      if (isValid(r)) return r
     }
+  } catch { URL.revokeObjectURL(blobUrl) }
 
-    img.onerror = () => {
-      URL.revokeObjectURL(url)
-      fileToBase64(file).then(resolve).catch(() => resolve(null))
+  // Estratégia 3: FileReader puro (sem compressão — último recurso)
+  return new Promise(resolve => {
+    const reader = new FileReader()
+    reader.onload = e => {
+      const r = e.target?.result || null
+      // Descarta se > 3MB base64 (evita estouro no body da API)
+      resolve(r && r.length < 3_000_000 ? r : null)
     }
-
-    img.src = url
+    reader.onerror = () => resolve(null)
+    reader.readAsDataURL(file)
   })
 }
 
