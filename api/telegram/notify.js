@@ -54,15 +54,24 @@ async function notifyTask(task) {
   if (!prov?.chat_id) return  // prestador sem Telegram vinculado
 
   const urg = URG[task.urgency] || ''
-  const sla = fmtDate(task.sla_deadline)
+  // sla_deadline só existe após início; due_date está sempre presente (data do dia para recorrentes)
+  const deadlineLine = task.sla_deadline
+    ? `⏱ *Conclusão prevista (SLA):* ${fmtDate(task.sla_deadline)}`
+    : task.due_date
+      ? `📅 *Data prevista:* ${fmtDate(task.due_date)}`
+      : ''
+  const scheduledLine = task.scheduled_start
+    ? `🗓 *Previsão de início:* ${fmtDate(task.scheduled_start)}`
+    : ''
   const msg = (
     `🔔 *Nova tarefa atribuída a você!*\n\n` +
     `${urg} *#${task.id}* — ${task.title}\n\n` +
     `📝 ${task.description || '–'}\n` +
     `👤 Solicitante: ${task.requester || '–'}\n` +
     `🏢 Setor: ${task.sector || '–'}\n` +
-    `⏱ *Conclusão prevista (SLA):* ${sla}\n\n` +
-    `_Use o menu para ver detalhes e iniciar a tarefa._`
+    (scheduledLine ? scheduledLine + '\n' : '') +
+    (deadlineLine  ? deadlineLine  + '\n' : '') +
+    `\n_Use o menu para ver detalhes e iniciar a tarefa._`
   )
   const keyboard = {
     inline_keyboard: [[

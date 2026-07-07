@@ -165,6 +165,29 @@ export default function PublicTrackForm() {
               </div>
             )}
 
+            {/* Previsão de execução — destaque visual quando disponível */}
+            {result.scheduledStart && (
+              <div style={{
+                background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: 12,
+                padding: '1rem 1.1rem', marginBottom: '1rem', display: 'flex', gap: '.75rem', alignItems: 'flex-start',
+              }}>
+                <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>🗓</span>
+                <div>
+                  <div style={{ fontSize: '.7rem', fontWeight: 700, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: '.2rem' }}>
+                    Previsão de execução
+                  </div>
+                  <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1e3a5f' }}>
+                    {fmtDate(result.scheduledStart)}
+                  </div>
+                  {result.slaDeadline && (
+                    <div style={{ fontSize: '.78rem', color: '#6b7280', marginTop: '.2rem' }}>
+                      Conclusão prevista até {fmtDate(result.slaDeadline)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Detalhes */}
             <div style={S.detailsBox}>
               <Row label="Descrição"    value={result.description} />

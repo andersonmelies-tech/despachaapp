@@ -58,7 +58,7 @@ export default async function handler(req) {
   // não só as criadas pelo formulário público (source='publico').
   const { data: task, error } = await sb
     .from('tasks')
-    .select('id, status, needs_approval, title, description, sector, assignee, created_at, updated_at, company_id')
+    .select('id, status, needs_approval, title, description, sector, assignee, created_at, updated_at, company_id, scheduled_start, sla_deadline')
     .eq('id', p)
     .maybeSingle()
 
@@ -84,17 +84,19 @@ export default async function handler(req) {
   }
 
   return json({
-    protocol:    task.id,
-    status:      task.status,
+    protocol:       task.id,
+    status:         task.status,
     step,
     statusLabel,
     statusIcon,
     statusColor,
-    title:       task.title,
-    description: task.description,
-    sector:      task.sector,
-    assignee:    task.assignee && task.assignee !== 'A definir' ? task.assignee : null,
-    createdAt:   task.created_at,
-    updatedAt:   task.updated_at,
+    title:          task.title,
+    description:    task.description,
+    sector:         task.sector,
+    assignee:       task.assignee && task.assignee !== 'A definir' ? task.assignee : null,
+    createdAt:      task.created_at,
+    updatedAt:      task.updated_at,
+    scheduledStart: task.scheduled_start || null,
+    slaDeadline:    task.sla_deadline    || null,
   })
 }

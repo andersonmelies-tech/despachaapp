@@ -11,16 +11,37 @@ const URG_OPTS = [
   { value: 'media',   label: '🟡 Média'    },
   { value: 'baixa',   label: '🟢 Baixa'   },
 ]
+const SLA_HOURS = { critica: 2, alta: 8, media: 24, baixa: 72 }
+
+function addHours(date, h) { return new Date(date.getTime() + h * 3600000) }
+function fmtDatetime(d) {
+  if (!d) return '–'
+  return new Date(d).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo',
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+// Valor mínimo para datetime-local (agora, no fuso local)
+function nowLocalMin() {
+  const d = new Date(); d.setSeconds(0, 0)
+  return d.toISOString().slice(0, 16)
+}
 
 // ── Modal de aprovação completo ───────────────────────────────────────────────
 function ApprovalModal({ req, providers, onConfirm, onCancel, saving }) {
   const photos = (() => { try { return req.photos ? JSON.parse(req.photos) : [] } catch { return [] } })()
   const [f, setF] = useState({
-    urgency:     'media',
-    assignee_id: '',
-    notes:       '',
+    urgency:         'media',
+    assignee_id:     '',
+    notes:           '',
+    scheduled_start: '',
   })
   function set(k, v) { setF(p => ({ ...p, [k]: v })) }
+
+  // Calcula previsão de conclusão e valida SLA
+  const slaHours      = SLA_HOURS[f.urgency] || 24
+  const scheduledDate = f.scheduled_start ? new Date(f.scheduled_start) : null
+  const completion    = scheduledDate ? addHours(scheduledDate, slaHours) : null
+  const maxAllowedStart = addHours(new Date(), slaHours)
+  const slaWarning = scheduledDate && scheduledDate > maxAllowedStart
 
   const infoRow = (icon, label, value) => value ? (
     <div style={{ display: 'flex', gap: '.5rem', fontSize: '.83rem', lineHeight: 1.5 }}>
@@ -90,6 +111,37 @@ function ApprovalModal({ req, providers, onConfirm, onCancel, saving }) {
             </div>
           </div>
 
+          {/* Previsão de início */}
+          <div>
+            <label className="flabel">PREVISÃO DE INÍCIO *</label>
+            <input
+              className="finput"
+              type="datetime-local"
+              value={f.scheduled_start}
+              min={nowLocalMin()}
+              onChange={e => set('scheduled_start', e.target.value)}
+            />
+            {/* Feedback em tempo real */}
+            {f.scheduled_start && (
+              <div style={{
+                marginTop: '.5rem', padding: '.6rem .85rem', borderRadius: 8, fontSize: '.82rem',
+                background: slaWarning ? '#fef3c7' : '#f0fdf4',
+                border: `1px solid ${slaWarning ? '#fcd34d' : '#86efac'}`,
+                color: slaWarning ? '#92400e' : '#166534',
+              }}>
+                {slaWarning ? (
+                  <>
+                    ⚠️ <strong>Atenção:</strong> para urgência <strong>{f.urgency}</strong> o SLA é de <strong>{slaHours}h</strong>.
+                    Iniciar em {fmtDatetime(scheduledDate)} significa que o prazo já teria sido extrapolado.
+                    {' '}Data limite para início: <strong>{fmtDatetime(maxAllowedStart)}</strong>.
+                  </>
+                ) : (
+                  <>✅ Conclusão prevista: <strong>{fmtDatetime(completion)}</strong> ({slaHours}h de SLA)</>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Observações internas (opcional) */}
           <div>
             <label className="flabel">OBSERVAÇÕES INTERNAS (opcional)</label>
@@ -100,7 +152,16 @@ function ApprovalModal({ req, providers, onConfirm, onCancel, saving }) {
         </div>
         <div className="mfoot">
           <button className="btn-sec" onClick={onCancel}>Cancelar</button>
-          <button className="btn-primary" onClick={() => onConfirm(f)} disabled={saving || !f.assignee_id}>
+          <button
+            className="btn-primary"
+            onClick={() => {
+              if (slaWarning) {
+                if (!confirm(`⚠️ A data de início proposta ultrapassa o SLA de ${slaHours}h para urgência "${f.urgency}".\n\nData limite de início: ${fmtDatetime(maxAllowedStart)}\n\nDeseja aprovar mesmo assim?`)) return
+              }
+              onConfirm(f)
+            }}
+            disabled={saving || !f.assignee_id || !f.scheduled_start}
+          >
             {saving ? 'Aprovando…' : '📤 Aprovar e notificar prestador'}
           </button>
         </div>
@@ -202,13 +263,21 @@ export default function RequestQueue({ showToast, onCountChange }) {
 
   async function approve(req, formData) {
     setSaving(true)
-    const prov = providers.find(p => p.id === Number(formData.assignee_id))
+    const prov     = providers.find(p => p.id === Number(formData.assignee_id))
+    const hours    = SLA_HOURS[formData.urgency] || 24
+    const startDt  = formData.scheduled_start ? new Date(formData.scheduled_start) : new Date()
+    const slaDt    = addHours(startDt, hours)
+    const fmt      = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' })
+
     const updates = {
       needs_approval:    false,
       assignee_id:       Number(formData.assignee_id),
       assignee:          prov?.name || '',
       urgency:           formData.urgency,
       provider_notified: false,
+      scheduled_start:   startDt.toISOString(),
+      sla_deadline:      slaDt.toISOString(),
+      due_date:          fmt.format(slaDt),
       ...(formData.notes && { notes: formData.notes.trim() }),
     }
     const { error } = await supabase.from('tasks').update(updates).eq('id', req.id)
