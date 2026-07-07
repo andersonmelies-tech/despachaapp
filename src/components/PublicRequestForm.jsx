@@ -5,21 +5,51 @@
  */
 import { useState, useRef, useEffect } from 'react'
 
-// Comprime imagem via canvas antes de enviar
-function compressImage(file, maxPx = 1200, quality = 0.72) {
+// Lê arquivo como base64 via FileReader (fallback confiável)
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload  = e => resolve(e.target.result)
+    reader.onerror = () => reject(new Error('FileReader falhou'))
+    reader.readAsDataURL(file)
+  })
+}
+
+// Comprime imagem via canvas; se canvas falhar (mobile, HEIC, tela bloqueada) usa FileReader
+async function compressImage(file, maxPx = 800, quality = 0.65) {
   return new Promise(resolve => {
     const img = new Image()
     const url = URL.createObjectURL(file)
+
     img.onload = () => {
       URL.revokeObjectURL(url)
-      const scale = Math.min(1, maxPx / Math.max(img.width, img.height))
-      const w = Math.round(img.width  * scale)
-      const h = Math.round(img.height * scale)
-      const canvas = document.createElement('canvas')
-      canvas.width = w; canvas.height = h
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h)
-      resolve(canvas.toDataURL('image/jpeg', quality))
+      try {
+        const scale = Math.min(1, maxPx / Math.max(img.width || 1, img.height || 1))
+        const w = Math.round((img.width  || 0) * scale)
+        const h = Math.round((img.height || 0) * scale)
+        if (!w || !h) { fileToBase64(file).then(resolve).catch(() => resolve(null)); return }
+        const canvas = document.createElement('canvas')
+        canvas.width = w; canvas.height = h
+        const ctx = canvas.getContext('2d')
+        if (!ctx) { fileToBase64(file).then(resolve).catch(() => resolve(null)); return }
+        ctx.drawImage(img, 0, 0, w, h)
+        const result = canvas.toDataURL('image/jpeg', quality)
+        // 'data:,' = canvas vazio (falhou) — usa FileReader
+        if (!result || result.length < 50 || result === 'data:,') {
+          fileToBase64(file).then(resolve).catch(() => resolve(null))
+          return
+        }
+        resolve(result)
+      } catch {
+        fileToBase64(file).then(resolve).catch(() => resolve(null))
+      }
     }
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      fileToBase64(file).then(resolve).catch(() => resolve(null))
+    }
+
     img.src = url
   })
 }
@@ -56,7 +86,8 @@ export default function PublicRequestForm() {
 
   async function addPhotos(files) {
     const compressed = await Promise.all(Array.from(files).slice(0, 3).map(compressImage))
-    setPhotos(p => [...p, ...compressed].slice(0, 3))
+    const valid = compressed.filter(b => b && b.length > 50 && b !== 'data:,')
+    setPhotos(p => [...p, ...valid].slice(0, 3))
   }
 
   async function submit(e) {
