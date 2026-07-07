@@ -13,17 +13,21 @@ const URG_OPTS = [
 ]
 
 // ── Modal de aprovação completo ───────────────────────────────────────────────
-function ApprovalModal({ req, providers, sectors, onConfirm, onCancel, saving }) {
+function ApprovalModal({ req, providers, onConfirm, onCancel, saving }) {
   const photos = (() => { try { return req.photos ? JSON.parse(req.photos) : [] } catch { return [] } })()
   const [f, setF] = useState({
-    title:      req.title || req.description?.slice(0, 80) || '',
-    sector:     req.client_address || '',
-    due_date:   '',
-    urgency:    'media',
-    assignee_id:'',
-    notes:      '',
+    urgency:     'media',
+    assignee_id: '',
+    notes:       '',
   })
   function set(k, v) { setF(p => ({ ...p, [k]: v })) }
+
+  const infoRow = (icon, label, value) => value ? (
+    <div style={{ display: 'flex', gap: '.5rem', fontSize: '.83rem', lineHeight: 1.5 }}>
+      <span style={{ flexShrink: 0 }}>{icon}</span>
+      <span><strong style={{ color: 'var(--muted)', fontSize: '.72rem', fontFamily: 'var(--mono)', letterSpacing: '.06em' }}>{label}:</strong> {value}</span>
+    </div>
+  ) : null
 
   return (
     <div className="overlay open" style={{ zIndex: 9000 }}>
@@ -34,80 +38,69 @@ function ApprovalModal({ req, providers, sectors, onConfirm, onCancel, saving })
         </div>
         <div className="mbody" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-          {/* Info do solicitante */}
-          <div style={{ background: 'var(--bg)', borderRadius: 8, padding: '.75rem', fontSize: '.84rem', lineHeight: 1.55 }}>
-            <div style={{ fontWeight: 700, marginBottom: '.2rem' }}>
-              👤 {req.requester}  ·  📞 {req.requester_phone || '—'}
+          {/* Info completa do formulário público — read-only */}
+          <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '.5rem', border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--blue)', fontFamily: 'var(--mono)', letterSpacing: '.08em', marginBottom: '.25rem' }}>
+              📋 DADOS DA SOLICITAÇÃO
             </div>
-            <div style={{ color: 'var(--muted)' }}>{req.description || req.title}</div>
+            {infoRow('👤', 'SOLICITANTE', req.requester)}
+            {infoRow('📞', 'TELEFONE',    req.requester_phone)}
+            {infoRow('🏢', 'SETOR',       req.requester_sector)}
+            {infoRow('📍', 'LOCAL',       req.sector)}
+            {infoRow('🔧', 'TIPO',        req.category)}
+            {req.description && (
+              <div style={{ marginTop: '.25rem', padding: '.6rem .75rem', background: '#fff', borderRadius: 7, border: '1px solid var(--border)', fontSize: '.85rem', lineHeight: 1.55, color: 'var(--text)' }}>
+                {req.description}
+              </div>
+            )}
           </div>
 
           {/* Fotos em miniatura */}
           {photos.length > 0 && (
-            <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
-              {photos.map((p, i) => (
-                <img key={i} src={p} alt="" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6, border: '1.5px solid var(--border)', cursor: 'pointer' }}
-                  onClick={() => window.open(p)} />
-              ))}
+            <div>
+              <div className="flabel" style={{ marginBottom: '.4rem' }}>FOTOS</div>
+              <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+                {photos.map((p, i) => (
+                  <img key={i} src={p} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1.5px solid var(--border)', cursor: 'pointer' }}
+                    onClick={() => window.open(p)} />
+                ))}
+              </div>
             </div>
           )}
 
-          {/* Título da tarefa */}
-          <div>
-            <label className="flabel">TÍTULO DA TAREFA *</label>
-            <input className="finput" value={f.title} onChange={e => set('title', e.target.value)}
-              placeholder="Descreva resumidamente o serviço" />
-          </div>
-
-          {/* Setor e Data */}
-          <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: 160 }}>
-              <label className="flabel">SETOR / LOCAL</label>
-              {sectors.length > 0 ? (
-                <select className="finput" value={f.sector} onChange={e => set('sector', e.target.value)}>
+          {/* Admin: apenas Prestador e Urgência */}
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+            <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--blue)', fontFamily: 'var(--mono)', letterSpacing: '.08em', marginBottom: '.75rem' }}>
+              👷 ATRIBUIÇÃO
+            </div>
+            <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap' }}>
+              <div style={{ flex: 2, minWidth: 160 }}>
+                <label className="flabel">PRESTADOR *</label>
+                <select className="finput" value={f.assignee_id} onChange={e => set('assignee_id', e.target.value)}>
                   <option value="">Selecione…</option>
-                  {sectors.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                  <option value={req.client_address || ''}>{req.client_address ? `Informado: ${req.client_address}` : 'Outro'}</option>
+                  {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
-              ) : (
-                <input className="finput" value={f.sector} onChange={e => set('sector', e.target.value)}
-                  placeholder={req.client_address || 'Ex: Recepção, Galpão B…'} />
-              )}
-            </div>
-            <div style={{ flex: 1, minWidth: 150 }}>
-              <label className="flabel">PRAZO</label>
-              <input className="finput" type="date" value={f.due_date} onChange={e => set('due_date', e.target.value)} />
-            </div>
-          </div>
-
-          {/* Prestador e Urgência */}
-          <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap' }}>
-            <div style={{ flex: 2, minWidth: 160 }}>
-              <label className="flabel">PRESTADOR *</label>
-              <select className="finput" value={f.assignee_id} onChange={e => set('assignee_id', e.target.value)}>
-                <option value="">Selecione…</option>
-                {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-            <div style={{ flex: 1, minWidth: 130 }}>
-              <label className="flabel">URGÊNCIA</label>
-              <select className="finput" value={f.urgency} onChange={e => set('urgency', e.target.value)}>
-                {URG_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+              </div>
+              <div style={{ flex: 1, minWidth: 130 }}>
+                <label className="flabel">CRITICIDADE</label>
+                <select className="finput" value={f.urgency} onChange={e => set('urgency', e.target.value)}>
+                  {URG_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
             </div>
           </div>
 
-          {/* Observações internas */}
+          {/* Observações internas (opcional) */}
           <div>
-            <label className="flabel">OBSERVAÇÕES INTERNAS</label>
+            <label className="flabel">OBSERVAÇÕES INTERNAS (opcional)</label>
             <textarea className="finput" rows={2} value={f.notes} onChange={e => set('notes', e.target.value)}
-              placeholder="Anotações para o prestador (opcional)" style={{ resize: 'vertical' }} />
+              placeholder="Anotações adicionais para o prestador…" style={{ resize: 'vertical' }} />
           </div>
 
         </div>
         <div className="mfoot">
           <button className="btn-sec" onClick={onCancel}>Cancelar</button>
-          <button className="btn-primary" onClick={() => onConfirm(f)} disabled={saving || !f.assignee_id || !f.title.trim()}>
+          <button className="btn-primary" onClick={() => onConfirm(f)} disabled={saving || !f.assignee_id}>
             {saving ? 'Aprovando…' : '📤 Aprovar e notificar prestador'}
           </button>
         </div>
@@ -212,14 +205,11 @@ export default function RequestQueue({ showToast, onCountChange }) {
     const prov = providers.find(p => p.id === Number(formData.assignee_id))
     const updates = {
       needs_approval:    false,
-      title:             formData.title.trim(),
-      sector:            formData.sector || req.client_address || null,
       assignee_id:       Number(formData.assignee_id),
       assignee:          prov?.name || '',
       urgency:           formData.urgency,
       provider_notified: false,
-      ...(formData.due_date  && { due_date: formData.due_date }),
-      ...(formData.notes     && { notes: formData.notes.trim() }),
+      ...(formData.notes && { notes: formData.notes.trim() }),
     }
     const { error } = await supabase.from('tasks').update(updates).eq('id', req.id)
     if (error) { showToast('Erro: ' + error.message, 'err'); setSaving(false); return }
@@ -426,7 +416,6 @@ export default function RequestQueue({ showToast, onCountChange }) {
         <ApprovalModal
           req={approving}
           providers={providers}
-          sectors={sectors}
           saving={saving}
           onConfirm={formData => approve(approving, formData)}
           onCancel={() => setApproving(null)}
