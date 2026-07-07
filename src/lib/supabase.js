@@ -83,22 +83,25 @@ export async function fetchStats() {
   const today = new Date().toISOString().split('T')[0]
   const tasks$ = tasks.filter(t => !t.recurrence_id || !t.due_date || t.due_date <= today)
 
-  const total      = tasks$.length
-  const pendente   = tasks$.filter(t => t.status === 'pendente').length
-  const em_and     = tasks$.filter(t => t.status === 'em_andamento').length
-  const concluida  = tasks$.filter(t => t.status === 'concluida').length
+  // Canceladas só entram na métrica própria — excluídas de todos os demais cálculos
   const cancelada  = tasks$.filter(t => t.status === 'cancelada').length
-  const atrasadas  = tasks$.filter(t => isOverdue(t)).length
-  const criticas   = tasks$.filter(t => t.urgency === 'critica' && !['concluida','cancelada'].includes(t.status)).length
+  const active$    = tasks$.filter(t => t.status !== 'cancelada')
 
-  const finished = tasks$.filter(t => t.elapsed_minutes)
+  const total      = active$.length
+  const pendente   = active$.filter(t => t.status === 'pendente').length
+  const em_and     = active$.filter(t => t.status === 'em_andamento').length
+  const concluida  = active$.filter(t => t.status === 'concluida').length
+  const atrasadas  = active$.filter(t => isOverdue(t)).length
+  const criticas   = active$.filter(t => t.urgency === 'critica' && t.status !== 'concluida').length
+
+  const finished = active$.filter(t => t.elapsed_minutes)
   const avg_minutes = finished.length
     ? Math.round(finished.reduce((a, t) => a + t.elapsed_minutes, 0) / finished.length)
     : 0
 
-  // Por prestador
+  // Por prestador — exclui canceladas
   const por_prestador = (provs || []).map(p => {
-    const pt = tasks$.filter(t => t.assignee_id === p.id)
+    const pt = active$.filter(t => t.assignee_id === p.id)
     const pf = pt.filter(t => t.elapsed_minutes)
     return {
       assignee: p.name,
@@ -111,9 +114,9 @@ export async function fetchStats() {
     }
   })
 
-  // Por setor
+  // Por setor — exclui canceladas
   const setorMap = {}
-  tasks$.forEach(t => {
+  active$.forEach(t => {
     if (!t.sector) return
     if (!setorMap[t.sector]) setorMap[t.sector] = { sector: t.sector, total: 0, concluidas: 0, abertas: 0 }
     setorMap[t.sector].total++
