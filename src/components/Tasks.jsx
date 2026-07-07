@@ -140,7 +140,11 @@ export default function Tasks({ showToast, sideFilter, user, plan, onStatsChange
 
   function filtered() {
     let list = [...tasks]
-    if (filterStatus) list = list.filter(t => t.status === filterStatus)
+    if (filterStatus) {
+      list = list.filter(t => t.status === filterStatus)
+    } else {
+      list = list.filter(t => t.status !== 'cancelada')
+    }
     if (filterUrgency) list = list.filter(t => t.urgency === filterUrgency)
     if (filterSector) list = list.filter(t => t.sector === filterSector || t.requester_sector === filterSector)
     if (filterAssignee) list = list.filter(t => t.assignee_id === Number(filterAssignee))
