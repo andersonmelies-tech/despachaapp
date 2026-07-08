@@ -76,7 +76,9 @@ export default async function handler(req) {
   } else if (task.status === 'concluida') {
     step = 3;  statusLabel = 'Concluído';                  statusIcon = '✅'; statusColor = '#10b981'
   } else if (task.status === 'em_andamento') {
-    step = 2;  statusLabel = 'Em atendimento';             statusIcon = '🔧'; statusColor = '#3b82f6'
+    step = 2;  statusLabel = 'Em atendimento';               statusIcon = '🔧'; statusColor = '#3b82f6'
+  } else if (task.status === 'prestador_externo') {
+    step = 2;  statusLabel = 'Prestador externo solicitado'; statusIcon = '🏢'; statusColor = '#7c3aed'
   } else if (task.needs_approval) {
     step = 0;  statusLabel = 'Aguardando aprovação';       statusIcon = '⏳'; statusColor = '#f59e0b'
   } else {

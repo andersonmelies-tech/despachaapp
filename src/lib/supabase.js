@@ -89,7 +89,7 @@ export async function fetchStats() {
 
   const total      = active$.length
   const pendente   = active$.filter(t => t.status === 'pendente').length
-  const em_and     = active$.filter(t => t.status === 'em_andamento').length
+  const em_and     = active$.filter(t => ['em_andamento', 'prestador_externo'].includes(t.status)).length
   const concluida  = active$.filter(t => t.status === 'concluida').length
   const atrasadas  = active$.filter(t => isOverdue(t)).length
   const criticas   = active$.filter(t => t.urgency === 'critica' && t.status !== 'concluida').length

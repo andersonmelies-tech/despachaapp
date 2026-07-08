@@ -89,6 +89,7 @@ async function getProv(chatId) {
 const URG = { critica: '🚨 CRÍTICA', alta: '🔴 Alta', media: '🟡 Média', baixa: '🟢 Baixa' }
 const STA = {
   pendente: '⏳ Pendente', em_andamento: '🔧 Em andamento',
+  prestador_externo: '🏢 Prestador Externo Acionado',
   concluida: '✅ Concluída', cancelada: '❌ Cancelada',
 }
 
@@ -169,6 +170,11 @@ function taskKb(t) {
   if (st === 'pendente')
     rows.push([{ text: '▶️ INICIAR AGORA', callback_data: `start:${tid}` }])
   if (st === 'em_andamento')
+    rows.push([
+      { text: '✅ FINALIZAR TAREFA',         callback_data: `done:${tid}` },
+      { text: '🏢 Acionar Prestador Externo', callback_data: `extprov:${tid}` },
+    ])
+  if (st === 'prestador_externo')
     rows.push([{ text: '✅ FINALIZAR TAREFA', callback_data: `done:${tid}` }])
   if (!['cancelada', 'concluida'].includes(st)) {
     rows.push([
@@ -265,7 +271,7 @@ async function showList(chatId, msgId, tasks, title) {
   for (const t of tasks.slice(0, 8)) {
     msg += fmtShort(t) + '\n\n'
     const urgIcon = (URG[t.urgency] || '').slice(0, 2)
-    const stIcon  = t.status === 'em_andamento' ? '🔧' : '⏳'
+    const stIcon  = t.status === 'em_andamento' ? '🔧' : t.status === 'prestador_externo' ? '🏢' : '⏳'
     btns.push([{ text: `${urgIcon}${stIcon} #${t.id} — ${t.title.slice(0, 28)}`, callback_data: `view:${t.id}` }])
   }
   btns.push([{ text: '🔙 Menu', callback_data: 'menu' }])
@@ -355,14 +361,35 @@ async function handleCallback(chatId, msgId, queryId, data) {
   if (data === 'my_tasks') {
     const prov = await getProv(chatId)
     if (!prov) return edit(chatId, msgId, '❌ Prestador não vinculado. Use /start.')
-    const tasks = await getTasks({ provId: prov.id, companyId: prov.company_id, status: ['pendente', 'em_andamento'] })
-    return showList(chatId, msgId, tasks, '📋 Suas Tarefas Abertas')
+
+    // Janela de datas em fuso SP: hoje + amanhã; se amanhã for sábado, inclui segunda também
+    const spFmt = d => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(d)
+    const now  = new Date()
+    const tmr  = new Date(now); tmr.setDate(tmr.getDate() + 1)
+    const dateWindow = [spFmt(now), spFmt(tmr)]
+    // Dia da semana de amanhã via partes da data SP (0=Dom … 6=Sáb)
+    const [ty, tm, td] = spFmt(tmr).split('-').map(Number)
+    const tmrDow = new Date(Date.UTC(ty, tm - 1, td)).getUTCDay()
+    if (tmrDow === 6) { // amanhã é sábado → inclui segunda-feira
+      const mon = new Date(now); mon.setDate(mon.getDate() + 3)
+      dateWindow.push(spFmt(mon))
+    }
+
+    const all   = await getTasks({ provId: prov.id, companyId: prov.company_id, status: ['pendente', 'em_andamento', 'prestador_externo'] })
+    const tasks = all.filter(t =>
+      ['em_andamento', 'prestador_externo'].includes(t.status) ||
+      dateWindow.includes((t.due_date || '').slice(0, 10))
+    )
+    const label = dateWindow.length === 3
+      ? `📋 Hoje, Amanhã e Segunda (${tasks.length})`
+      : `📋 Hoje e Amanhã (${tasks.length})`
+    return showList(chatId, msgId, tasks, label)
   }
 
   if (data === 'in_progress') {
     const prov = await getProv(chatId)
     if (!prov) return edit(chatId, msgId, '❌ Prestador não vinculado.')
-    const tasks = await getTasks({ provId: prov.id, companyId: prov.company_id, status: 'em_andamento' })
+    const tasks = await getTasks({ provId: prov.id, companyId: prov.company_id, status: ['em_andamento', 'prestador_externo'] })
     return showList(chatId, msgId, tasks, '🔧 Em Andamento')
   }
 
@@ -471,6 +498,20 @@ async function handleCallback(chatId, msgId, queryId, data) {
     const tid = parseInt(data.split(':')[1])
     await updateTask(tid, chatId, { status: 'cancelada' })
     return edit(chatId, msgId, `❌ Tarefa #${tid} cancelada.`, backMenuKb())
+  }
+
+  // Acionar prestador externo
+  if (data.startsWith('extprov:')) {
+    const tid  = parseInt(data.split(':')[1])
+    const task = await updateTask(tid, chatId, { status: 'prestador_externo' })
+    if (!task) return edit(chatId, msgId, '❌ Tarefa não encontrada.')
+    return edit(chatId, msgId,
+      `🏢 *Prestador externo acionado — Tarefa #${tid}*\n\n📋 ${task.title}\n\n_O solicitante verá o status "Prestador externo solicitado" na consulta pública._`,
+      { inline_keyboard: [
+        [{ text: '✅ FINALIZAR TAREFA', callback_data: `done:${tid}` }],
+        [{ text: '💬 Observação', callback_data: `obs:${tid}` }, { text: '📷 Enviar Foto', callback_data: `photo:${tid}` }],
+        [{ text: '🔙 Minhas Tarefas', callback_data: 'my_tasks' }],
+      ]})
   }
 
   // Observação
