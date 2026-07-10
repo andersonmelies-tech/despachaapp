@@ -74,7 +74,7 @@ export default function Calendar({ showToast }) {
               {dayTasks.slice(0, 3).map(t => (
                 <div
                   key={t.id}
-                  className={`cal-task-chip ${t.status === 'concluida' ? 'concluida' : t.urgency}`}
+                  className={`cal-task-chip ${t.status === 'concluida' ? 'concluida' : t.status === 'cadastrada' ? 'cadastrada' : t.urgency}`}
                   onClick={e => { e.stopPropagation(); setDetailTask(t) }}
                   title={`${t.recurrence_id ? '🔄 Recorrente — ' : ''}#${t.id} — ${t.title}`}
                 >

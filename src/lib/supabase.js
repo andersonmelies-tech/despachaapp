@@ -47,7 +47,7 @@ export function isoToLocalDate(iso) {
 }
 
 export function isOverdue(task) {
-  if (['concluida', 'cancelada', 'pendente'].includes(task.status)) return false
+  if (['concluida', 'cancelada', 'pendente', 'cadastrada'].includes(task.status)) return false
   const now = new Date()
   // T23:59:59 evita que o parse UTC desloque a data -3h (Brazil), tornando
   // tarefas com due_date=hoje já atrasadas desde às 21h de ontem
@@ -83,9 +83,10 @@ export async function fetchStats() {
   const today = new Date().toISOString().split('T')[0]
   const tasks$ = tasks.filter(t => !t.recurrence_id || !t.due_date || t.due_date <= today)
 
-  // Canceladas só entram na métrica própria — excluídas de todos os demais cálculos
+  // Canceladas e cadastradas só entram nas métricas próprias
   const cancelada  = tasks$.filter(t => t.status === 'cancelada').length
-  const active$    = tasks$.filter(t => t.status !== 'cancelada')
+  const cadastrada = tasks$.filter(t => t.status === 'cadastrada').length
+  const active$    = tasks$.filter(t => !['cancelada', 'cadastrada'].includes(t.status))
 
   const total      = active$.length
   const pendente   = active$.filter(t => t.status === 'pendente').length
@@ -125,7 +126,7 @@ export async function fetchStats() {
   })
   const por_setor = Object.values(setorMap).sort((a,b) => b.total - a.total)
 
-  const result = { total, pendente, em_andamento: em_and, concluida, cancelada, atrasadas, criticas, avg_minutes, por_prestador, por_setor }
+  const result = { total, pendente, em_andamento: em_and, concluida, cancelada, cadastrada, atrasadas, criticas, avg_minutes, por_prestador, por_setor }
   setStatsCache(result)   // salva para próxima abertura da aba
   return result
 }

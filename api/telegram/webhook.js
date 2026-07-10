@@ -88,7 +88,7 @@ async function getProv(chatId) {
 // ── Labels ────────────────────────────────────────────────────────────────────
 const URG = { critica: '🚨 CRÍTICA', alta: '🔴 Alta', media: '🟡 Média', baixa: '🟢 Baixa' }
 const STA = {
-  pendente: '⏳ Pendente', em_andamento: '🔧 Em andamento',
+  cadastrada: '📋 Cadastrada', pendente: '⏳ Pendente', em_andamento: '🔧 Em andamento',
   prestador_externo: '🏢 Prestador Externo Acionado',
   concluida: '✅ Concluída', cancelada: '❌ Cancelada',
 }

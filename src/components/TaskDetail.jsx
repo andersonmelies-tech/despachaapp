@@ -3,9 +3,9 @@ import { supabase, calcSlaDeadline, isoToLocalDate, isOverdue } from '../lib/sup
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 export const URG_LABEL = { critica: '🚨 Crítica', alta: '🔴 Alta', media: '🟡 Média', baixa: '🟢 Baixa' }
-export const STA_LABEL = { pendente: '⏳ Pendente', em_andamento: '🔧 Em andamento', prestador_externo: '🏢 Prestador Externo', concluida: '✅ Concluída', cancelada: '❌ Cancelada' }
+export const STA_LABEL = { cadastrada: '📋 Cadastrada', pendente: '⏳ Pendente', em_andamento: '🔧 Em andamento', prestador_externo: '🏢 Prestador Externo', concluida: '✅ Concluída', cancelada: '❌ Cancelada' }
 export const URGENCIES = ['critica', 'alta', 'media', 'baixa']
-export const STATUSES  = ['pendente', 'em_andamento', 'prestador_externo', 'concluida', 'cancelada']
+export const STATUSES  = ['cadastrada', 'pendente', 'em_andamento', 'prestador_externo', 'concluida', 'cancelada']
 
 export function fmtMin(m) {
   if (!m) return '–'
@@ -304,6 +304,7 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
             <div className="fg">
               <label className="flabel">STATUS</label>
               <select className="finput" value={f.status} onChange={e => set('status', e.target.value)}>
+                <option value="cadastrada">📋 Cadastrada</option>
                 <option value="pendente">⏳ Pendente</option>
                 <option value="em_andamento">🔧 Em andamento</option>
                 <option value="prestador_externo">🏢 Prestador Externo</option>

@@ -205,6 +205,7 @@ select:focus { border-color: var(--blue); }
 .ubadge.baixa   { background: #00d48a18; color: var(--green);  border: 1px solid #00d48a44; }
 
 .stbadge { display: inline-flex; align-items: center; gap: .3rem; font-size: .72rem; font-weight: 600; padding: .22rem .6rem; border-radius: 20px; }
+.stbadge.cadastrada   { background: #6d28d918; color: #7c3aed;       border: 1px solid #6d28d944; }
 .stbadge.pendente     { background: #F57E2218; color: var(--warn);   border: 1px solid #F57E2244; }
 .stbadge.em_andamento { background: #3296EE18; color: var(--blue);   border: 1px solid #3296EE44; }
 .stbadge.concluida    { background: #00d48a18; color: var(--green);  border: 1px solid #00d48a44; }
@@ -308,7 +309,8 @@ textarea.finput { resize: vertical; min-height: 80px; }
 .cal-task-chip.alta     { background: var(--warn);  color: #fff; }
 .cal-task-chip.media    { background: var(--blue);  color: #fff; }
 .cal-task-chip.baixa    { background: var(--green); color: #000; }
-.cal-task-chip.concluida { background: var(--s3); color: var(--muted); text-decoration: line-through; }
+.cal-task-chip.concluida  { background: var(--s3); color: var(--muted); text-decoration: line-through; }
+.cal-task-chip.cadastrada { background: #ede9fe; color: #7c3aed; border: 1px dashed #a78bfa; }
 .cal-task-chip:hover { filter: brightness(1.15); }
 
 .cal-task-row {

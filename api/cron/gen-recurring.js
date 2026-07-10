@@ -131,6 +131,12 @@ export default async function handler(req) {
     }
   }
 
+  // Flip: tarefas "cadastrada" com due_date <= hoje viram "pendente"
+  await sb.from('tasks')
+    .update({ status: 'pendente' })
+    .eq('status', 'cadastrada')
+    .lte('due_date', today)
+
   let totalGenerated = 0
   const results = []
 
@@ -175,7 +181,7 @@ export default async function handler(req) {
       urgency:          rec.urgency     || 'media',
       category:         rec.category    || null,
       sector:           rec.sector      || null,
-      status:           'pendente',
+      status:           date > today ? 'cadastrada' : 'pendente',
       due_date:         date,
       recurrence_id:    rec.id,
       recurrence_date:  date,
