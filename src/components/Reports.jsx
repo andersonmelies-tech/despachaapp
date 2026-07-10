@@ -65,6 +65,7 @@ function taskToRow(t) {
 // ── Tab 1 — Visão Geral ────────────────────────────────────────────────────────
 
 const BAR_COLORS = {
+  cadastrada:   '#7c3aed',
   pendente:     '#F57E22',
   em_andamento: '#3296EE',
   concluida:    '#00d48a',
@@ -94,6 +95,7 @@ function OverviewTab({ tasks }) {
   const conclusaoPct = total ? Math.round((concluidas / total) * 100) : 0
 
   const statusCounts = {
+    cadastrada:   tasks.filter(t => t.status === 'cadastrada').length,
     pendente:     tasks.filter(t => t.status === 'pendente').length,
     em_andamento: tasks.filter(t => t.status === 'em_andamento').length,
     concluida:    concluidas,
