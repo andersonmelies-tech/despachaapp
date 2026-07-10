@@ -115,7 +115,9 @@ function RecurrenceModal({ rec, providers, sectors, onClose, onSave, showToast }
     let error
 
     if (isEdit) {
-      const r = await supabase.from('task_recurrences').update(payload).eq('id', rec.id)
+      // Reseta last_generated para que o gen-recurring regenere a partir de hoje
+      // com os novos dias configurados (tarefas existentes são deduplicadas)
+      const r = await supabase.from('task_recurrences').update({ ...payload, last_generated: null }).eq('id', rec.id)
       error = r.error
     } else {
       payload.start_date  = new Date().toISOString().split('T')[0]
