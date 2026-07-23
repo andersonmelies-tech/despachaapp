@@ -39,9 +39,10 @@ function ApprovalModal({ req, providers, onConfirm, onCancel, saving }) {
   // Calcula previsão de conclusão e valida SLA
   const slaHours      = SLA_HOURS[f.urgency] || 24
   const scheduledDate = f.scheduled_start ? new Date(f.scheduled_start) : null
-  const completion    = scheduledDate ? addHours(scheduledDate, slaHours) : null
+  const validDate     = scheduledDate && !isNaN(scheduledDate.getTime())
+  const completion    = validDate ? addHours(scheduledDate, slaHours) : null
   const maxAllowedStart = addHours(new Date(), slaHours)
-  const slaWarning = scheduledDate && scheduledDate > maxAllowedStart
+  const slaWarning = validDate && scheduledDate > maxAllowedStart
 
   const infoRow = (icon, label, value) => value ? (
     <div style={{ display: 'flex', gap: '.5rem', fontSize: '.83rem', lineHeight: 1.5 }}>
@@ -266,6 +267,11 @@ export default function RequestQueue({ showToast, onCountChange }) {
     const prov     = providers.find(p => p.id === Number(formData.assignee_id))
     const hours    = SLA_HOURS[formData.urgency] || 24
     const startDt  = formData.scheduled_start ? new Date(formData.scheduled_start) : new Date()
+    if (isNaN(startDt.getTime())) {
+      showToast('Data de início inválida. Verifique o ano digitado.', 'err')
+      setSaving(false)
+      return
+    }
     const slaDt    = addHours(startDt, hours)
     const fmt      = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' })
 
