@@ -7,14 +7,20 @@ import autoTable from 'jspdf-autotable'
 
 function getPeriodStart(period, customFrom) {
   const now = new Date()
-  if (period === 'hoje') {
-    const d = new Date(now); d.setHours(0,0,0,0); return d
-  }
-  if (period === '7d')  { const d = new Date(now); d.setDate(d.getDate() - 7);  return d }
-  if (period === '30d') { const d = new Date(now); d.setDate(d.getDate() - 30); return d }
-  if (period === '90d') { const d = new Date(now); d.setDate(d.getDate() - 90); return d }
+  if (period === 'hoje') { const d = new Date(now); d.setHours(0,0,0,0); return d }
+  if (period === '7d')   { const d = new Date(now); d.setDate(d.getDate() - 7);  return d }
+  if (period === '30d')  { const d = new Date(now); d.setDate(d.getDate() - 30); return d }
+  if (period === '90d')  { const d = new Date(now); d.setDate(d.getDate() - 90); return d }
   if (period === 'custom' && customFrom) return new Date(customFrom)
   return null
+}
+
+function monthRange(monthYear) {
+  if (!monthYear) return { start: null, end: null }
+  const [y, m] = monthYear.split('-').map(Number)
+  const start = new Date(y, m - 1, 1)
+  const end   = new Date(y, m, 0, 23, 59, 59)
+  return { start, end }
 }
 
 function fmt(dt) {
@@ -645,11 +651,26 @@ const TABS = [
 
 const PERIODS = [
   { id: 'hoje',   label: 'Hoje' },
-  { id: '7d',     label: '7 dias' },
-  { id: '30d',    label: '30 dias' },
-  { id: '90d',    label: '90 dias' },
+  { id: '7d',     label: 'Últimos 7 dias' },
+  { id: '30d',    label: 'Últimos 30 dias' },
+  { id: '90d',    label: 'Últimos 90 dias' },
+  { id: 'mes',    label: 'Por mês' },
   { id: 'custom', label: 'Personalizado' },
 ]
+
+function buildMonthOpts() {
+  const opts = []
+  const now  = new Date()
+  for (let i = 12; i >= -2; i--) {
+    const d   = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const label = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+    opts.push({ val, label: label.charAt(0).toUpperCase() + label.slice(1) })
+  }
+  return opts
+}
+const MONTH_OPTS = buildMonthOpts()
+const THIS_MONTH = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2,'0')}`
 
 const STA_OPTIONS = ['cadastrada','pendente','em_andamento','prestador_externo','concluida','cancelada']
 const STA_LABELS  = { cadastrada:'Cadastrada', pendente:'Pendente', em_andamento:'Em andamento', prestador_externo:'Prestador Externo', concluida:'Concluída', cancelada:'Cancelada' }
@@ -660,7 +681,8 @@ const sel = { width:'auto', padding:'.4rem .65rem', fontSize:'.82rem' }
 
 export default function Reports({ showToast }) {
   const [tab,          setTab]          = useState('overview')
-  const [period,       setPeriod]       = useState('30d')
+  const [period,       setPeriod]       = useState('mes')
+  const [monthYear,    setMonthYear]    = useState(THIS_MONTH)
   const [customFrom,   setCustomFrom]   = useState('')
   const [customTo,     setCustomTo]     = useState('')
   const [fSector,      setFSector]      = useState('')
@@ -690,24 +712,38 @@ export default function Reports({ showToast }) {
   , [allTasks])
 
   const tasks = useMemo(() => {
-    const start = getPeriodStart(period, customFrom)
-    const end   = period === 'custom' && customTo ? new Date(customTo + 'T23:59:59') : null
+    let start, end
+    if (period === 'mes') {
+      const r = monthRange(monthYear)
+      start = r.start; end = r.end
+    } else {
+      start = getPeriodStart(period, customFrom)
+      end   = period === 'custom' && customTo ? new Date(customTo + 'T23:59:59') : null
+    }
+
     return allTasks.filter(t => {
-      const d = new Date(t.created_at)
+      // Tarefas recorrentes: filtrar pela data de execução (due_date)
+      // Tarefas normais: filtrar pela data de criação (created_at)
+      const refDate = t.recurrence_id && t.due_date ? t.due_date + 'T12:00:00' : t.created_at
+      const d = new Date(refDate)
       if (start && d < start) return false
       if (end   && d > end)   return false
-      if (fSector   && t.sector      !== fSector)                      return false
-      if (fProvider && String(t.assignee_id) !== fProvider)            return false
-      if (fStatus   && t.status      !== fStatus)                      return false
-      if (fUrgency  && t.urgency     !== fUrgency)                     return false
+      if (fSector   && t.sector      !== fSector)             return false
+      if (fProvider && String(t.assignee_id) !== fProvider)   return false
+      if (fStatus   && t.status      !== fStatus)             return false
+      if (fUrgency  && t.urgency     !== fUrgency)            return false
       return true
     })
-  }, [allTasks, period, customFrom, customTo, fSector, fProvider, fStatus, fUrgency])
+  }, [allTasks, period, monthYear, customFrom, customTo, fSector, fProvider, fStatus, fUrgency])
 
   const hasFilter = fSector || fProvider || fStatus || fUrgency
   function clearFilters() { setFSector(''); setFProvider(''); setFStatus(''); setFUrgency('') }
 
-  const periodLabel = { hoje:'Hoje', '7d':'Últimos 7 dias', '30d':'Últimos 30 dias', '90d':'Últimos 90 dias', custom:'Personalizado' }
+  const monthLabel = MONTH_OPTS.find(o => o.val === monthYear)?.label || monthYear
+  const periodLabel = {
+    hoje:'Hoje', '7d':'Últimos 7 dias', '30d':'Últimos 30 dias', '90d':'Últimos 90 dias',
+    mes: monthLabel, custom:'Personalizado',
+  }
   const activeFilters = [
     fSector   && `Setor: ${fSector}`,
     fProvider && `Colaborador: ${providers.find(p=>String(p.id)===fProvider)?.name}`,
@@ -739,6 +775,11 @@ export default function Reports({ showToast }) {
         <select className="finput" style={sel} value={period} onChange={e => setPeriod(e.target.value)}>
           {PERIODS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
         </select>
+        {period === 'mes' && (
+          <select className="finput" style={{ ...sel, minWidth: 160 }} value={monthYear} onChange={e => setMonthYear(e.target.value)}>
+            {MONTH_OPTS.map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
+          </select>
+        )}
         {period === 'custom' && (<>
           <input type="date" className="finput" style={sel} value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
           <span style={{ color:'var(--muted)', fontSize:'.82rem' }}>até</span>
