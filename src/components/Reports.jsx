@@ -68,44 +68,110 @@ function taskToRow(t) {
   }
 }
 
+// ── SVG Chart helpers ─────────────────────────────────────────────────────────
+
+function polar(cx, cy, r, deg) {
+  const rad = (deg - 90) * Math.PI / 180
+  return [+(cx + r * Math.cos(rad)).toFixed(2), +(cy + r * Math.sin(rad)).toFixed(2)]
+}
+
+function DonutChart({ segments, size = 200 }) {
+  const cx = size / 2, cy = size / 2
+  const R = size * 0.42, r = size * 0.265
+  const total = segments.reduce((s, d) => s + d.value, 0)
+  if (total === 0) return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={cx} cy={cy} r={(R+r)/2} fill="none" stroke="var(--border)" strokeWidth={R-r} />
+      <text x={cx} y={cy+5} textAnchor="middle" fontSize="11" fill="var(--muted)">Sem dados</text>
+    </svg>
+  )
+  let angle = 0
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ overflow:'visible' }}>
+      {segments.filter(s => s.value > 0).map((seg, i) => {
+        const sweep = (seg.value / total) * 360
+        const gap = sweep > 6 ? 2.5 : 0
+        const s = angle + gap, e = angle + sweep - gap
+        angle += sweep
+        if (e <= s + 0.1) return null
+        const [x1,y1] = polar(cx,cy,R,s), [x2,y2] = polar(cx,cy,R,e)
+        const [x3,y3] = polar(cx,cy,r,e), [x4,y4] = polar(cx,cy,r,s)
+        const lg = (e - s) > 180 ? 1 : 0
+        return <path key={i} d={`M${x1},${y1} A${R},${R} 0 ${lg},1 ${x2},${y2} L${x3},${y3} A${r},${r} 0 ${lg},0 ${x4},${y4}Z`} fill={seg.color} />
+      })}
+      <text x={cx} y={cy-2} textAnchor="middle" fontSize={size*.155} fontWeight="900" fill="var(--text)" fontFamily="inherit">{total}</text>
+      <text x={cx} y={cy+size*.12} textAnchor="middle" fontSize={size*.07} fill="var(--muted)" fontFamily="inherit">tarefas</text>
+    </svg>
+  )
+}
+
+function HalfGauge({ pct, size = 180 }) {
+  const cx = size/2, cy = size*.63, R = size*.38, sw = size*.105
+  const [sx,sy] = polar(cx,cy,R,-180)
+  const [ex,ey] = polar(cx,cy,R,0)
+  const cap  = Math.min(Math.max(pct,0),100)
+  const ang  = -180 + (cap/100)*180
+  const [vx,vy] = polar(cx,cy,R,ang)
+  const lg   = cap > 50 ? 1 : 0
+  const col  = cap >= 80 ? '#00c896' : cap >= 50 ? '#ffb347' : '#ff4d6a'
+  return (
+    <svg width={size} height={size*.72} viewBox={`0 0 ${size} ${size*.72}`}>
+      <path d={`M${sx},${sy} A${R},${R} 0 0,1 ${ex},${ey}`} fill="none" stroke="var(--border)" strokeWidth={sw} strokeLinecap="round"/>
+      {cap > 0 && <path d={`M${sx},${sy} A${R},${R} 0 ${lg},1 ${vx},${vy}`} fill="none" stroke={col} strokeWidth={sw} strokeLinecap="round"/>}
+      <circle cx={vx} cy={vy} r={sw*.55} fill={col}/>
+      {[0,25,50,75,100].map(v => {
+        const [mx,my] = polar(cx,cy,R*1.24,-180+v*1.8)
+        return <text key={v} x={mx} y={my} textAnchor="middle" fontSize={size*.055} fill="var(--muted)" fontFamily="inherit">{v}</text>
+      })}
+      <text x={cx} y={cy+2} textAnchor="middle" fontSize={size*.21} fontWeight="900" fill={col} fontFamily="inherit">{pct}%</text>
+      <text x={cx} y={cy+size*.145} textAnchor="middle" fontSize={size*.07} fill="var(--muted)" fontFamily="inherit">SLA cumprido</text>
+    </svg>
+  )
+}
+
 // ── Cabeçalho de impressão ────────────────────────────────────────────────────
 
 function ReportPrintHeader({ periodLabel, activeFilters, tasks, companyName }) {
-  const now = new Date().toLocaleDateString('pt-BR', {
+  const now = new Date().toLocaleString('pt-BR', {
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
   })
   return (
-    <div className="print-only" style={{ marginBottom: '1.5rem', fontFamily: 'sans-serif' }}>
-      {/* Cabeçalho com logo */}
+    <div className="print-only" style={{ marginBottom: '1.8rem', fontFamily: 'Arial, sans-serif' }}>
       <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: '#0f2240', color: '#fff', padding: '14px 20px', borderRadius: 0,
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+        paddingBottom: 10, borderBottom: '2px solid #0f2240',
         WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <img src="/logo.png" alt="DespachaApp" style={{ height: 36, objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <img src="/logo.png" alt="" style={{ height: 32, objectFit: 'contain' }}
             onError={e => { e.target.style.display = 'none' }} />
           <div>
-            <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: '.03em' }}>DespachaApp</div>
-            <div style={{ fontSize: 10, color: '#94a3b8', letterSpacing: '.08em' }}>GESTÃO DE SERVIÇOS</div>
+            <div style={{ fontWeight: 800, fontSize: 14, color: '#0f2240', letterSpacing: '.02em' }}>
+              {companyName || 'DespachaApp'}
+            </div>
+            <div style={{ fontSize: 9, color: '#64748b', letterSpacing: '.06em', textTransform: 'uppercase', marginTop: 1 }}>
+              Gestão de Serviços
+            </div>
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>RELATÓRIO OPERACIONAL</div>
-          {companyName && <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{companyName}</div>}
-          <div style={{ fontSize: 9, color: '#64748b', marginTop: 3 }}>Gerado em {now}</div>
+          <div style={{ fontWeight: 900, fontSize: 16, color: '#0f2240', letterSpacing: '.04em', textTransform: 'uppercase' }}>
+            Relatório Operacional
+          </div>
+          <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 3 }}>Gerado em {now}</div>
         </div>
       </div>
-
-      {/* Barra de período e filtros */}
       <div style={{
-        background: '#f1f5f9', borderLeft: '4px solid #2563eb',
-        padding: '7px 16px', display: 'flex', flexWrap: 'wrap', gap: '12px',
-        fontSize: 11, color: '#374151', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginTop: 8, fontSize: 10, color: '#374151',
       }}>
-        <span><strong>Período:</strong> {periodLabel}</span>
-        {activeFilters.map(f => <span key={f}>· {f}</span>)}
-        <span style={{ marginLeft: 'auto', fontWeight: 700, color: '#1e3a5f' }}>
+        <span>
+          <strong>Período:</strong> {periodLabel}
+          {activeFilters.length > 0 && (
+            <span style={{ color: '#64748b' }}>{' '}·{' '}{activeFilters.join(' · ')}</span>
+          )}
+        </span>
+        <span style={{ fontWeight: 700, color: '#0f2240', fontSize: 11 }}>
           {tasks.length} tarefa{tasks.length !== 1 ? 's' : ''} no período
         </span>
       </div>
@@ -113,119 +179,272 @@ function ReportPrintHeader({ periodLabel, activeFilters, tasks, companyName }) {
   )
 }
 
-// ── Tab 1 — Visão Geral ────────────────────────────────────────────────────────
+// ── BI Dashboard ──────────────────────────────────────────────────────────────
 
-const BAR_COLORS = {
-  cadastrada:   '#7c3aed',
-  pendente:     '#F57E22',
-  em_andamento: '#3296EE',
-  concluida:    '#00d48a',
-  cancelada:    '#7B818F',
-  critica:      '#ff4d6d',
-  alta:         '#F57E22',
-  media:        '#3296EE',
-  baixa:        '#00d48a',
+const BI = {
+  success: '#00c896', warn: '#ffb347', critical: '#ff4d6a',
+  blue: '#3b6fe8', purple: '#7c6de8', gray: '#6b7a90',
 }
 
-const STA_NAMES = {
-  cadastrada: 'Cadastrada', pendente: 'Pendente', em_andamento: 'Em andamento',
-  concluida: 'Concluída', cancelada: 'Cancelada',
-}
-const URG_NAMES = { critica: 'Crítica', alta: 'Alta', media: 'Média', baixa: 'Baixa' }
-
-function OverviewTab({ tasks }) {
+function BIDashboard({ tasks, providers }) {
   const total      = tasks.length
   const concluidas = tasks.filter(t => t.status === 'concluida').length
   const atrasadas  = tasks.filter(t => isOverdue(t)).length
+  const pendentes  = tasks.filter(t => t.status === 'pendente').length
+  const emAnd      = tasks.filter(t => ['em_andamento','prestador_externo'].includes(t.status)).length
+  const canceladas = tasks.filter(t => t.status === 'cancelada').length
+  const cadastradas= tasks.filter(t => t.status === 'cadastrada').length
 
   const finished   = tasks.filter(t => t.elapsed_minutes)
-  const avgMin     = finished.length
-    ? Math.round(finished.reduce((a,t) => a + t.elapsed_minutes, 0) / finished.length)
-    : 0
+  const avgMin     = finished.length ? Math.round(finished.reduce((a,t) => a + t.elapsed_minutes, 0) / finished.length) : 0
 
-  const withSla    = tasks.filter(t => t.sla_deadline && ['concluida','cancelada'].includes(t.status))
-  const slaOk      = withSla.filter(t => {
-    if (!t.completed_at || !t.sla_deadline) return false
-    return new Date(t.completed_at) <= new Date(t.sla_deadline)
-  }).length
-  const slaPct       = withSla.length ? Math.round((slaOk / withSla.length) * 100) : 0
-  const conclusaoPct = total ? Math.round((concluidas / total) * 100) : 0
+  const withSla = tasks.filter(t => t.sla_deadline && ['concluida','cancelada'].includes(t.status))
+  const slaOk   = withSla.filter(t => t.completed_at && new Date(t.completed_at) <= new Date(t.sla_deadline)).length
+  const slaPct  = withSla.length ? Math.round((slaOk / withSla.length) * 100) : 0
+  const concPct = total ? Math.round((concluidas / total) * 100) : 0
 
-  const statusCounts = {
-    cadastrada:   tasks.filter(t => t.status === 'cadastrada').length,
-    pendente:     tasks.filter(t => t.status === 'pendente').length,
-    em_andamento: tasks.filter(t => t.status === 'em_andamento').length,
-    concluida:    concluidas,
-    cancelada:    tasks.filter(t => t.status === 'cancelada').length,
-  }
-  const urgCounts = {
-    critica: tasks.filter(t => t.urgency === 'critica').length,
-    alta:    tasks.filter(t => t.urgency === 'alta').length,
-    media:   tasks.filter(t => t.urgency === 'media').length,
-    baixa:   tasks.filter(t => t.urgency === 'baixa').length,
-  }
-  const maxStatus = Math.max(...Object.values(statusCounts), 1)
-  const maxUrg    = Math.max(...Object.values(urgCounts), 1)
-
-  const kpis = [
-    { label: 'Total de Tarefas',  val: total,            suf: '',  color: '#2563eb', icon: '📋' },
-    { label: 'Concluídas',        val: concluidas,       suf: '',  color: '#10b981', icon: '✅' },
-    { label: 'Taxa de Conclusão', val: conclusaoPct,     suf: '%', color: conclusaoPct >= 80 ? '#10b981' : conclusaoPct >= 50 ? '#f59e0b' : '#ef4444', icon: '📈' },
-    { label: 'Tempo Médio',       val: fmtHours(avgMin), suf: '',  color: '#6366f1', icon: '⏱', mono: true },
-    { label: 'Atrasadas',         val: atrasadas,        suf: '',  color: atrasadas > 0 ? '#ef4444' : '#10b981', icon: atrasadas > 0 ? '⚠️' : '✔' },
-    { label: 'SLA Cumprido',      val: slaPct,           suf: '%', color: slaPct >= 80 ? '#10b981' : '#f59e0b', icon: '🎯' },
+  const statusSegs = [
+    { key:'concluida',    label:'Concluídas',   value: concluidas,  color: BI.success  },
+    { key:'em_andamento', label:'Em andamento',  value: emAnd,       color: BI.blue     },
+    { key:'pendente',     label:'Pendentes',     value: pendentes,   color: BI.warn     },
+    { key:'cadastrada',   label:'Cadastradas',   value: cadastradas, color: BI.purple   },
+    { key:'cancelada',    label:'Canceladas',    value: canceladas,  color: BI.gray     },
   ]
 
+  const urgSegs = [
+    { label:'Crítica', value: tasks.filter(t => t.urgency==='critica').length, color: BI.critical },
+    { label:'Alta',    value: tasks.filter(t => t.urgency==='alta').length,    color: BI.warn     },
+    { label:'Média',   value: tasks.filter(t => t.urgency==='media').length,   color: BI.blue     },
+    { label:'Baixa',   value: tasks.filter(t => t.urgency==='baixa').length,   color: BI.success  },
+  ]
+  const maxUrg = Math.max(...urgSegs.map(u => u.value), 1)
+
+  const provRows = providers.map(p => {
+    const pt   = tasks.filter(t => t.assignee_id === p.id)
+    const conc = pt.filter(t => t.status === 'concluida').length
+    const fin  = pt.filter(t => t.elapsed_minutes)
+    const avg  = fin.length ? Math.round(fin.reduce((a,t) => a + t.elapsed_minutes, 0) / fin.length) : null
+    return { id: p.id, name: p.name, total: pt.length, conc, atr: pt.filter(t => isOverdue(t)).length, avg,
+      pct: pt.length ? Math.round(conc / pt.length * 100) : 0 }
+  }).filter(p => p.total > 0).sort((a,b) => b.pct - a.pct || b.conc - a.conc)
+
+  const sectorMap = {}
+  tasks.forEach(t => {
+    const s = t.sector || '(sem setor)'
+    if (!sectorMap[s]) sectorMap[s] = { total:0, conc:0, atr:0 }
+    sectorMap[s].total++
+    if (t.status === 'concluida') sectorMap[s].conc++
+    if (isOverdue(t)) sectorMap[s].atr++
+  })
+  const sectorRows = Object.entries(sectorMap)
+    .map(([k,v]) => ({ sector:k, ...v, pct: v.total ? Math.round(v.conc/v.total*100) : 0 }))
+    .sort((a,b) => b.total - a.total).slice(0, 8)
+  const maxSec = Math.max(...sectorRows.map(r => r.total), 1)
+
+  const kpis = [
+    { label:'Total',        val: total,            suf:'',  color: BI.blue,    dot:'■' },
+    { label:'Concluídas',   val: concluidas,        suf:'',  color: BI.success, dot:'■' },
+    { label:'% Conclusão',  val: concPct,           suf:'%', color: concPct>=80?BI.success:concPct>=50?BI.warn:BI.critical, dot:'▲' },
+    { label:'Em Execução',  val: emAnd,             suf:'',  color: BI.purple,  dot:'■' },
+    { label:'Atrasadas',    val: atrasadas,         suf:'',  color: atrasadas>0?BI.critical:BI.success, dot: atrasadas>0?'▲':'■' },
+    { label:'Tempo Médio',  val: fmtHours(avgMin),  suf:'',  color: '#0ea5e9',  dot:'■', mono:true },
+  ]
+
+  const medal = ['🥇','🥈','🥉']
+  const pctColor = p => p >= 80 ? BI.success : p >= 50 ? BI.warn : BI.critical
+
+  // Card style helper
+  const card = (extra = {}) => ({
+    background:'var(--s1)', border:'1px solid var(--border)',
+    borderRadius:12, padding:'1.1rem 1.25rem', ...extra
+  })
+  const cardTitle = {
+    fontSize:'.68rem', fontWeight:700, letterSpacing:'.1em',
+    textTransform:'uppercase', color:'var(--muted)', marginBottom:'1rem',
+  }
+
   return (
-    <div>
-      {/* KPI grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '.75rem', marginBottom: '1.25rem' }}>
+    <div style={{ display:'flex', flexDirection:'column', gap:'.9rem' }}>
+
+      {/* ── KPI Strip ── */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:'.6rem' }}>
         {kpis.map(k => (
           <div key={k.label} style={{
-            background: 'var(--s1)', border: '1px solid var(--border)',
-            borderTop: `3px solid ${k.color}`, borderRadius: 10,
-            padding: '1rem 1.1rem', display: 'flex', flexDirection: 'column', gap: '.25rem',
+            ...card(), padding:'.9rem 1rem',
+            borderBottom:`3px solid ${k.color}`,
           }}>
-            <div style={{ fontSize: '.72rem', color: 'var(--muted)', fontWeight: 600, letterSpacing: '.05em', textTransform: 'uppercase' }}>
-              {k.icon} {k.label}
+            <div style={{ fontSize:'.62rem', fontWeight:700, letterSpacing:'.09em', textTransform:'uppercase', color:'var(--muted)', marginBottom:'.45rem' }}>
+              {k.label}
             </div>
             <div style={{
-              fontSize: '1.75rem', fontWeight: 900, color: k.color, lineHeight: 1.1,
+              fontSize:'1.85rem', fontWeight:900, color:k.color, lineHeight:1,
+              fontVariantNumeric:'tabular-nums',
               fontFamily: k.mono ? 'var(--mono)' : 'inherit',
-            }}>
-              {k.val}{k.suf}
-            </div>
+            }}>{k.val}{k.suf}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        {/* Status bars */}
-        <div className="cfg-card">
-          <div className="cfg-title">Distribuição por Status</div>
-          {Object.entries(statusCounts).map(([key, count]) => (
-            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '.65rem', marginBottom: '.6rem' }}>
-              <span style={{ minWidth: 110, fontSize: '.78rem', fontWeight: 500 }}>{STA_NAMES[key] || key}</span>
-              <div style={{ flex: 1, height: 8, background: 'var(--s2)', borderRadius: 99, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${(count/maxStatus)*100}%`, background: BAR_COLORS[key], borderRadius: 99, transition: 'width .4s', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
-              </div>
-              <span style={{ minWidth: 24, textAlign: 'right', fontFamily: 'var(--mono)', fontSize: '.82rem', fontWeight: 700 }}>{count}</span>
+      {/* ── Charts Triptych ── */}
+      <div style={{ display:'grid', gridTemplateColumns:'1.15fr 1fr 0.95fr', gap:'.9rem' }}>
+
+        {/* Status Donut */}
+        <div style={card()}>
+          <div style={cardTitle}>Distribuição por Status</div>
+          <div style={{ display:'flex', alignItems:'center', gap:'1.1rem' }}>
+            <div style={{ flexShrink:0 }}>
+              <DonutChart segments={statusSegs} size={160} />
             </div>
-          ))}
+            <div style={{ flex:1, display:'flex', flexDirection:'column', gap:'.48rem' }}>
+              {statusSegs.map(s => (
+                <div key={s.key} style={{ display:'flex', alignItems:'center', gap:'.5rem' }}>
+                  <span style={{ width:8, height:8, borderRadius:2, background:s.color, flexShrink:0 }} />
+                  <span style={{ flex:1, fontSize:'.75rem', color:'var(--text)' }}>{s.label}</span>
+                  <span style={{ fontSize:'.78rem', fontWeight:800, color:s.color, fontVariantNumeric:'tabular-nums', minWidth:22, textAlign:'right' }}>{s.value}</span>
+                  <span style={{ fontSize:'.65rem', color:'var(--muted)', minWidth:30, textAlign:'right' }}>
+                    {total ? Math.round(s.value/total*100) : 0}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* Urgência bars */}
-        <div className="cfg-card">
-          <div className="cfg-title">Distribuição por Urgência</div>
-          {Object.entries(urgCounts).map(([key, count]) => (
-            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '.65rem', marginBottom: '.6rem' }}>
-              <span style={{ minWidth: 60, fontSize: '.78rem', fontWeight: 500 }}>{URG_NAMES[key] || key}</span>
-              <div style={{ flex: 1, height: 8, background: 'var(--s2)', borderRadius: 99, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${(count/maxUrg)*100}%`, background: BAR_COLORS[key], borderRadius: 99, transition: 'width .4s', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
+        {/* Urgency bars */}
+        <div style={card()}>
+          <div style={cardTitle}>Distribuição por Urgência</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:'.8rem' }}>
+            {urgSegs.map(u => (
+              <div key={u.label}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'.22rem' }}>
+                  <span style={{ fontSize:'.78rem', fontWeight:600, color:'var(--text)' }}>{u.label}</span>
+                  <span style={{ fontSize:'.78rem', fontWeight:800, color:u.color, fontVariantNumeric:'tabular-nums' }}>{u.value}</span>
+                </div>
+                <div style={{ height:10, background:'var(--s2)', borderRadius:5, overflow:'hidden' }}>
+                  <div style={{ height:'100%', width:`${(u.value/maxUrg)*100}%`, background:u.color, borderRadius:5,
+                    WebkitPrintColorAdjust:'exact', printColorAdjust:'exact' }} />
+                </div>
               </div>
-              <span style={{ minWidth: 24, textAlign: 'right', fontFamily: 'var(--mono)', fontSize: '.82rem', fontWeight: 700 }}>{count}</span>
+            ))}
+          </div>
+          {(urgSegs[0].value + urgSegs[1].value) > 0 && (
+            <div style={{ marginTop:'.9rem', padding:'.45rem .7rem', background:'#ff4d6a12',
+              border:'1px solid #ff4d6a44', borderRadius:7, fontSize:'.72rem', color:BI.critical, fontWeight:600,
+              display:'flex', alignItems:'center', gap:'.4rem' }}>
+              <span>⚠</span>
+              <span>{urgSegs[0].value + urgSegs[1].value} tarefas críticas / altas requerem atenção</span>
             </div>
-          ))}
+          )}
+        </div>
+
+        {/* SLA Gauge */}
+        <div style={{ ...card(), display:'flex', flexDirection:'column', alignItems:'center' }}>
+          <div style={{ ...cardTitle, alignSelf:'flex-start', width:'100%' }}>Índice de SLA</div>
+          <HalfGauge pct={slaPct} size={174} />
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'.45rem', width:'100%', marginTop:'.6rem' }}>
+            {[
+              { label:'No prazo', val: slaOk,              color: BI.success  },
+              { label:'Atrasadas',val: withSla.length-slaOk, color: BI.critical },
+              { label:'Avaliadas', val: withSla.length,    color: 'var(--muted)' },
+              { label:'Sem SLA',   val: total - withSla.length, color:'var(--muted)' },
+            ].map(c => (
+              <div key={c.label} style={{ textAlign:'center', padding:'.4rem .3rem', background:'var(--s2)', borderRadius:7 }}>
+                <div style={{ fontSize:'1.05rem', fontWeight:900, color:c.color, fontVariantNumeric:'tabular-nums' }}>{c.val}</div>
+                <div style={{ fontSize:'.6rem', color:'var(--muted)', marginTop:'.1rem', letterSpacing:'.04em' }}>{c.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Leaderboard + Sectors ── */}
+      <div style={{ display:'grid', gridTemplateColumns:'1.25fr 1fr', gap:'.9rem' }}>
+
+        {/* Provider Leaderboard */}
+        <div style={card()}>
+          <div style={cardTitle}>Ranking de Colaboradores — Taxa de conclusão</div>
+          {provRows.length === 0 ? (
+            <div className="empty">Sem dados no período</div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:'.55rem' }}>
+              {provRows.slice(0,8).map((p,i) => (
+                <div key={p.id} style={{ display:'flex', alignItems:'center', gap:'.7rem' }}>
+                  {/* Position badge */}
+                  <span style={{
+                    width:24, height:24, borderRadius:6, flexShrink:0, fontSize:'.75rem', fontWeight:800,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    background: i<3 ? ['#fbbf2420','#94a3b820','#d9770620'][i] : 'var(--s2)',
+                    color: i<3 ? ['#fbbf24','#94a3b8','#d97706'][i] : 'var(--muted)',
+                  }}>
+                    {i < 3 ? medal[i] : i+1}
+                  </span>
+                  {/* Name */}
+                  <span style={{ flex:1, fontSize:'.8rem', fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.name}</span>
+                  {/* Score fraction */}
+                  <span style={{ fontSize:'.7rem', color:'var(--muted)', fontVariantNumeric:'tabular-nums', minWidth:38, textAlign:'right' }}>
+                    {p.conc}/{p.total}
+                  </span>
+                  {/* Bar */}
+                  <div style={{ width:90, height:7, background:'var(--s2)', borderRadius:99, overflow:'hidden', flexShrink:0 }}>
+                    <div style={{ height:'100%', width:`${p.pct}%`, background:pctColor(p.pct), borderRadius:99,
+                      WebkitPrintColorAdjust:'exact', printColorAdjust:'exact' }} />
+                  </div>
+                  {/* Pct */}
+                  <span style={{ fontSize:'.75rem', fontWeight:800, color:pctColor(p.pct), minWidth:34, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>
+                    {p.pct}%
+                  </span>
+                  {/* Overdue badge */}
+                  {p.atr > 0 && (
+                    <span style={{ fontSize:'.6rem', background:'#ff4d6a18', color:BI.critical, border:'1px solid #ff4d6a44',
+                      borderRadius:4, padding:'1px 5px', fontWeight:700, flexShrink:0 }}>
+                      {p.atr}⚠
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Sector Matrix */}
+        <div style={card()}>
+          <div style={cardTitle}>Setores — Volume e conclusão</div>
+          {sectorRows.length === 0 ? (
+            <div className="empty">Sem dados</div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:'.6rem' }}>
+              {sectorRows.map(s => (
+                <div key={s.sector}>
+                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'.18rem' }}>
+                    <span style={{ fontSize:'.75rem', fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1, paddingRight:8 }}>
+                      {s.sector}
+                    </span>
+                    <span style={{ fontSize:'.7rem', color:'var(--muted)', fontVariantNumeric:'tabular-nums', flexShrink:0 }}>
+                      {s.conc}/{s.total} &nbsp;
+                      <span style={{ color:pctColor(s.pct), fontWeight:700 }}>{s.pct}%</span>
+                    </span>
+                  </div>
+                  {/* Stacked bar: concluída + restante */}
+                  <div style={{ height:8, background:'var(--s2)', borderRadius:4, overflow:'hidden', display:'flex' }}>
+                    <div style={{ height:'100%', width:`${s.conc/maxSec*100}%`, background:BI.success,
+                      WebkitPrintColorAdjust:'exact', printColorAdjust:'exact' }} />
+                    {s.atr > 0 && (
+                      <div style={{ height:'100%', width:`${s.atr/maxSec*100}%`, background:BI.critical,
+                        WebkitPrintColorAdjust:'exact', printColorAdjust:'exact' }} />
+                    )}
+                  </div>
+                </div>
+              ))}
+              {/* Legend */}
+              <div style={{ display:'flex', gap:'1rem', marginTop:'.4rem' }}>
+                {[['Concluídas', BI.success],['Atrasadas', BI.critical]].map(([l,c]) => (
+                  <span key={l} style={{ display:'flex', alignItems:'center', gap:'.3rem', fontSize:'.65rem', color:'var(--muted)' }}>
+                    <span style={{ width:8, height:8, borderRadius:2, background:c, flexShrink:0 }} />{l}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -923,7 +1142,7 @@ export default function Reports({ showToast }) {
         <div className="empty">Carregando dados…</div>
       ) : (
         <>
-          {tab === 'overview'  && <OverviewTab  tasks={tasks} />}
+          {tab === 'overview'  && <BIDashboard  tasks={tasks} providers={providers} />}
           {tab === 'providers' && <ProviderTab  tasks={tasks} providers={providers} />}
           {tab === 'sectors'   && <SectorTab    tasks={tasks} />}
           {tab === 'export'    && <ExportTab    tasks={tasks} providers={providers} period={period} />}

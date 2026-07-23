@@ -36,7 +36,13 @@ function trialDaysLeft(trialEndsAt) {
 export default function App() {
   const [session,     setSession]     = useState(null)
   const [loading,     setLoading]     = useState(true)
-  const [tab,         setTab]         = useState('dashboard')
+  const [tab, setTabState] = useState(() => {
+    const h = window.location.hash.slice(1)
+    const valid = ['dashboard','tasks','calendar','reports','settings','admin','pricing',
+                   'recurrences','queue','clients','budgets','cashflow','orders','payments']
+    return valid.includes(h) ? h : 'dashboard'
+  })
+  const setTab = (t) => { setTabState(t); window.location.hash = t }
   const [sideFilter,  setSideFilter]  = useState('all')
   const [toast,       setToast]       = useState({ msg: '', type: '', visible: false })
   const [stats,           setStats]           = useState(null)
