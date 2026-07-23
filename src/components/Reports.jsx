@@ -68,6 +68,51 @@ function taskToRow(t) {
   }
 }
 
+// ── Cabeçalho de impressão ────────────────────────────────────────────────────
+
+function ReportPrintHeader({ periodLabel, activeFilters, tasks, companyName }) {
+  const now = new Date().toLocaleDateString('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+  })
+  return (
+    <div className="print-only" style={{ marginBottom: '1.5rem', fontFamily: 'sans-serif' }}>
+      {/* Cabeçalho com logo */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: '#0f2240', color: '#fff', padding: '14px 20px', borderRadius: 0,
+        WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <img src="/logo.png" alt="DespachaApp" style={{ height: 36, objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
+            onError={e => { e.target.style.display = 'none' }} />
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: '.03em' }}>DespachaApp</div>
+            <div style={{ fontSize: 10, color: '#94a3b8', letterSpacing: '.08em' }}>GESTÃO DE SERVIÇOS</div>
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>RELATÓRIO OPERACIONAL</div>
+          {companyName && <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{companyName}</div>}
+          <div style={{ fontSize: 9, color: '#64748b', marginTop: 3 }}>Gerado em {now}</div>
+        </div>
+      </div>
+
+      {/* Barra de período e filtros */}
+      <div style={{
+        background: '#f1f5f9', borderLeft: '4px solid #2563eb',
+        padding: '7px 16px', display: 'flex', flexWrap: 'wrap', gap: '12px',
+        fontSize: 11, color: '#374151', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact',
+      }}>
+        <span><strong>Período:</strong> {periodLabel}</span>
+        {activeFilters.map(f => <span key={f}>· {f}</span>)}
+        <span style={{ marginLeft: 'auto', fontWeight: 700, color: '#1e3a5f' }}>
+          {tasks.length} tarefa{tasks.length !== 1 ? 's' : ''} no período
+        </span>
+      </div>
+    </div>
+  )
+}
+
 // ── Tab 1 — Visão Geral ────────────────────────────────────────────────────────
 
 const BAR_COLORS = {
@@ -81,6 +126,12 @@ const BAR_COLORS = {
   media:        '#3296EE',
   baixa:        '#00d48a',
 }
+
+const STA_NAMES = {
+  cadastrada: 'Cadastrada', pendente: 'Pendente', em_andamento: 'Em andamento',
+  concluida: 'Concluída', cancelada: 'Cancelada',
+}
+const URG_NAMES = { critica: 'Crítica', alta: 'Alta', media: 'Média', baixa: 'Baixa' }
 
 function OverviewTab({ tasks }) {
   const total      = tasks.length
@@ -97,7 +148,7 @@ function OverviewTab({ tasks }) {
     if (!t.completed_at || !t.sla_deadline) return false
     return new Date(t.completed_at) <= new Date(t.sla_deadline)
   }).length
-  const slaPct     = withSla.length ? Math.round((slaOk / withSla.length) * 100) : 0
+  const slaPct       = withSla.length ? Math.round((slaOk / withSla.length) * 100) : 0
   const conclusaoPct = total ? Math.round((concluidas / total) * 100) : 0
 
   const statusCounts = {
@@ -113,62 +164,69 @@ function OverviewTab({ tasks }) {
     media:   tasks.filter(t => t.urgency === 'media').length,
     baixa:   tasks.filter(t => t.urgency === 'baixa').length,
   }
-
   const maxStatus = Math.max(...Object.values(statusCounts), 1)
   const maxUrg    = Math.max(...Object.values(urgCounts), 1)
 
   const kpis = [
-    { label: 'Total de Tarefas',   val: total,               suf: '' },
-    { label: 'Taxa de Conclusão',  val: conclusaoPct,        suf: '%' },
-    { label: 'Tempo Médio',        val: fmtHours(avgMin),    suf: '', mono: true },
-    { label: 'Tarefas Atrasadas',  val: atrasadas,           suf: '', red: true },
-    { label: 'SLA Cumprido',       val: slaPct,              suf: '%', green: true },
+    { label: 'Total de Tarefas',  val: total,            suf: '',  color: '#2563eb', icon: '📋' },
+    { label: 'Concluídas',        val: concluidas,       suf: '',  color: '#10b981', icon: '✅' },
+    { label: 'Taxa de Conclusão', val: conclusaoPct,     suf: '%', color: conclusaoPct >= 80 ? '#10b981' : conclusaoPct >= 50 ? '#f59e0b' : '#ef4444', icon: '📈' },
+    { label: 'Tempo Médio',       val: fmtHours(avgMin), suf: '',  color: '#6366f1', icon: '⏱', mono: true },
+    { label: 'Atrasadas',         val: atrasadas,        suf: '',  color: atrasadas > 0 ? '#ef4444' : '#10b981', icon: atrasadas > 0 ? '⚠️' : '✔' },
+    { label: 'SLA Cumprido',      val: slaPct,           suf: '%', color: slaPct >= 80 ? '#10b981' : '#f59e0b', icon: '🎯' },
   ]
 
   return (
     <div>
       {/* KPI grid */}
-      <div className="kpi-grid">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '.75rem', marginBottom: '1.25rem' }}>
         {kpis.map(k => (
-          <div key={k.label} className="kpi-card">
-            <div className="kpi-val" style={k.red ? { color: 'var(--red)' } : k.green ? { color: 'var(--green)' } : {}}>
+          <div key={k.label} style={{
+            background: 'var(--s1)', border: '1px solid var(--border)',
+            borderTop: `3px solid ${k.color}`, borderRadius: 10,
+            padding: '1rem 1.1rem', display: 'flex', flexDirection: 'column', gap: '.25rem',
+          }}>
+            <div style={{ fontSize: '.72rem', color: 'var(--muted)', fontWeight: 600, letterSpacing: '.05em', textTransform: 'uppercase' }}>
+              {k.icon} {k.label}
+            </div>
+            <div style={{
+              fontSize: '1.75rem', fontWeight: 900, color: k.color, lineHeight: 1.1,
+              fontFamily: k.mono ? 'var(--mono)' : 'inherit',
+            }}>
               {k.val}{k.suf}
             </div>
-            <div className="kpi-label">{k.label}</div>
           </div>
         ))}
       </div>
 
-      {/* Status bars */}
-      <div className="cfg-card" style={{ marginBottom: '1rem' }}>
-        <div className="cfg-title">Por Status</div>
-        {Object.entries(statusCounts).map(([key, count]) => (
-          <div key={key} className="bar-row">
-            <span className="bar-label">
-              <span className={`stbadge ${key}`}>{key.replace('_',' ')}</span>
-            </span>
-            <div className="bar-track">
-              <div className="bar-fill" style={{ width: `${(count/maxStatus)*100}%`, background: BAR_COLORS[key] }} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        {/* Status bars */}
+        <div className="cfg-card">
+          <div className="cfg-title">Distribuição por Status</div>
+          {Object.entries(statusCounts).map(([key, count]) => (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '.65rem', marginBottom: '.6rem' }}>
+              <span style={{ minWidth: 110, fontSize: '.78rem', fontWeight: 500 }}>{STA_NAMES[key] || key}</span>
+              <div style={{ flex: 1, height: 8, background: 'var(--s2)', borderRadius: 99, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${(count/maxStatus)*100}%`, background: BAR_COLORS[key], borderRadius: 99, transition: 'width .4s', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
+              </div>
+              <span style={{ minWidth: 24, textAlign: 'right', fontFamily: 'var(--mono)', fontSize: '.82rem', fontWeight: 700 }}>{count}</span>
             </div>
-            <span className="bar-count">{count}</span>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      {/* Urgência bars */}
-      <div className="cfg-card">
-        <div className="cfg-title">Por Urgência</div>
-        {Object.entries(urgCounts).map(([key, count]) => (
-          <div key={key} className="bar-row">
-            <span className="bar-label">
-              <span className={`ubadge ${key}`}>{key}</span>
-            </span>
-            <div className="bar-track">
-              <div className="bar-fill" style={{ width: `${(count/maxUrg)*100}%`, background: BAR_COLORS[key] }} />
+        {/* Urgência bars */}
+        <div className="cfg-card">
+          <div className="cfg-title">Distribuição por Urgência</div>
+          {Object.entries(urgCounts).map(([key, count]) => (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '.65rem', marginBottom: '.6rem' }}>
+              <span style={{ minWidth: 60, fontSize: '.78rem', fontWeight: 500 }}>{URG_NAMES[key] || key}</span>
+              <div style={{ flex: 1, height: 8, background: 'var(--s2)', borderRadius: 99, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${(count/maxUrg)*100}%`, background: BAR_COLORS[key], borderRadius: 99, transition: 'width .4s', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
+              </div>
+              <span style={{ minWidth: 24, textAlign: 'right', fontFamily: 'var(--mono)', fontSize: '.82rem', fontWeight: 700 }}>{count}</span>
             </div>
-            <span className="bar-count">{count}</span>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -221,37 +279,41 @@ function ProviderTab({ tasks, providers }) {
 
   return (
     <div className="cfg-card" style={{ overflowX: 'auto' }}>
-      <div className="cfg-title">Por Colaborador</div>
+      <div className="cfg-title" style={{ marginBottom: '.85rem' }}>👤 Desempenho por Colaborador</div>
       {rows.length === 0 ? (
         <div className="empty">Nenhum colaborador com tarefas no período</div>
       ) : (
         <table className="rep-table">
           <thead>
             <tr>
-              <Th k="name"        label="Nome" />
-              <Th k="total"       label="Total" />
-              <Th k="concluidas"  label="Concluídas" />
-              <Th k="em_andamento" label="Em andamento" />
-              <Th k="atrasadas"   label="Atrasadas" />
-              <Th k="avgMin"      label="Tempo médio" />
-              <Th k="pct"         label="% Conclusão" />
+              <Th k="name"         label="Colaborador" />
+              <Th k="total"        label="Total" />
+              <Th k="concluidas"   label="✅ Concluídas" />
+              <Th k="em_andamento" label="🔧 Andamento" />
+              <Th k="atrasadas"    label="⚠️ Atrasadas" />
+              <Th k="avgMin"       label="⏱ Tempo médio" />
+              <Th k="pct"          label="% Conclusão" />
             </tr>
           </thead>
           <tbody>
-            {rows.map(r => (
-              <tr key={r.id}>
-                <td style={{ fontWeight: 600 }}>{r.name}</td>
-                <td style={{ fontFamily: 'var(--mono)' }}>{r.total}</td>
-                <td style={{ color: 'var(--green)', fontFamily: 'var(--mono)' }}>{r.concluidas}</td>
-                <td style={{ color: 'var(--blue)',  fontFamily: 'var(--mono)' }}>{r.em_andamento}</td>
-                <td style={{ color: r.atrasadas > 0 ? 'var(--red)' : 'var(--muted)', fontFamily: 'var(--mono)' }}>{r.atrasadas}</td>
-                <td style={{ fontFamily: 'var(--mono)', color: 'var(--muted)' }}>{fmtHours(r.avgMin)}</td>
-                <td>
+            {rows.map((r, i) => (
+              <tr key={r.id} style={{ background: i % 2 === 0 ? 'var(--s1)' : 'var(--s2)' }}>
+                <td style={{ fontWeight: 700 }}>{r.name}</td>
+                <td style={{ fontFamily: 'var(--mono)', fontWeight: 600, textAlign: 'center' }}>{r.total}</td>
+                <td style={{ color: '#10b981', fontFamily: 'var(--mono)', fontWeight: 600, textAlign: 'center' }}>{r.concluidas}</td>
+                <td style={{ color: 'var(--blue)', fontFamily: 'var(--mono)', textAlign: 'center' }}>{r.em_andamento}</td>
+                <td style={{ textAlign: 'center' }}>
+                  {r.atrasadas > 0
+                    ? <span style={{ background: '#fef2f2', color: '#ef4444', borderRadius: 6, padding: '2px 8px', fontWeight: 700, fontFamily: 'var(--mono)' }}>{r.atrasadas}</span>
+                    : <span style={{ color: 'var(--muted)', fontFamily: 'var(--mono)' }}>0</span>}
+                </td>
+                <td style={{ fontFamily: 'var(--mono)', color: 'var(--muted)', textAlign: 'center' }}>{fmtHours(r.avgMin)}</td>
+                <td style={{ minWidth: 130 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-                    <div className="prog-bar">
-                      <div className="prog-fill" style={{ width: `${r.pct}%` }} />
+                    <div style={{ flex: 1, height: 7, background: 'var(--s2)', borderRadius: 99, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${r.pct}%`, background: r.pct >= 80 ? '#10b981' : r.pct >= 50 ? '#f59e0b' : '#ef4444', borderRadius: 99, WebkitPrintColorAdjust:'exact', printColorAdjust:'exact' }} />
                     </div>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', minWidth: '32px' }}>{r.pct}%</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', minWidth: 32, fontWeight: 700 }}>{r.pct}%</span>
                   </div>
                 </td>
               </tr>
@@ -282,36 +344,36 @@ function SectorTab({ tasks }) {
 
   return (
     <div className="cfg-card">
-      <div className="cfg-title">Por Setor</div>
+      <div className="cfg-title" style={{ marginBottom: '.85rem' }}>🏢 Desempenho por Setor</div>
       {rows.length === 0 ? (
         <div className="empty">Nenhuma tarefa no período</div>
       ) : (
         <>
-          <table className="rep-table" style={{ marginBottom: '1.25rem' }}>
+          <table className="rep-table" style={{ marginBottom: '1.5rem' }}>
             <thead>
               <tr>
                 <th>Setor</th>
-                <th>Total</th>
-                <th>Concluídas</th>
-                <th>Abertas</th>
+                <th style={{ textAlign: 'center' }}>Total</th>
+                <th style={{ textAlign: 'center' }}>✅ Concluídas</th>
+                <th style={{ textAlign: 'center' }}>📋 Abertas</th>
                 <th>% Conclusão</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map(r => {
+              {rows.map((r, i) => {
                 const pct = r.total ? Math.round((r.concluidas / r.total) * 100) : 0
                 return (
-                  <tr key={r.sector}>
-                    <td style={{ fontWeight: 600 }}>{r.sector}</td>
-                    <td style={{ fontFamily: 'var(--mono)' }}>{r.total}</td>
-                    <td style={{ color: 'var(--green)', fontFamily: 'var(--mono)' }}>{r.concluidas}</td>
-                    <td style={{ color: 'var(--warn)',  fontFamily: 'var(--mono)' }}>{r.abertas}</td>
-                    <td>
+                  <tr key={r.sector} style={{ background: i % 2 === 0 ? 'var(--s1)' : 'var(--s2)' }}>
+                    <td style={{ fontWeight: 700 }}>{r.sector}</td>
+                    <td style={{ fontFamily: 'var(--mono)', fontWeight: 600, textAlign: 'center' }}>{r.total}</td>
+                    <td style={{ color: '#10b981', fontFamily: 'var(--mono)', fontWeight: 600, textAlign: 'center' }}>{r.concluidas}</td>
+                    <td style={{ color: '#f59e0b', fontFamily: 'var(--mono)', textAlign: 'center' }}>{r.abertas}</td>
+                    <td style={{ minWidth: 130 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-                        <div className="prog-bar">
-                          <div className="prog-fill" style={{ width: `${pct}%` }} />
+                        <div style={{ flex: 1, height: 7, background: 'var(--s2)', borderRadius: 99, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${pct}%`, background: pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444', borderRadius: 99, WebkitPrintColorAdjust:'exact', printColorAdjust:'exact' }} />
                         </div>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', minWidth: '32px' }}>{pct}%</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', minWidth: 32, fontWeight: 700 }}>{pct}%</span>
                       </div>
                     </td>
                   </tr>
@@ -320,15 +382,15 @@ function SectorTab({ tasks }) {
             </tbody>
           </table>
 
-          {/* Barras horizontais */}
-          <div className="cfg-title" style={{ marginTop: '.5rem' }}>Volume por setor</div>
+          {/* Barras de volume */}
+          <div className="cfg-title" style={{ marginBottom: '.6rem' }}>Volume de tarefas por setor</div>
           {rows.map(r => (
-            <div key={r.sector} className="bar-row">
-              <span className="bar-label" style={{ minWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.sector}</span>
-              <div className="bar-track">
-                <div className="bar-fill" style={{ width: `${(r.total/maxTotal)*100}%`, background: 'var(--blue)' }} />
+            <div key={r.sector} style={{ display: 'flex', alignItems: 'center', gap: '.65rem', marginBottom: '.55rem' }}>
+              <span style={{ minWidth: 150, fontSize: '.8rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.sector}</span>
+              <div style={{ flex: 1, height: 14, background: 'var(--s2)', borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${(r.total/maxTotal)*100}%`, background: 'linear-gradient(90deg,#2563eb,#3b82f6)', borderRadius: 4, WebkitPrintColorAdjust:'exact', printColorAdjust:'exact' }} />
               </div>
-              <span className="bar-count">{r.total}</span>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '.82rem', fontWeight: 700, minWidth: 24, textAlign: 'right' }}>{r.total}</span>
             </div>
           ))}
         </>
@@ -691,17 +753,20 @@ export default function Reports({ showToast }) {
   const [fUrgency,     setFUrgency]     = useState('')
   const [allTasks,     setAllTasks]     = useState([])
   const [providers,    setProviders]    = useState([])
+  const [companyName,  setCompanyName]  = useState('DespachaApp')
   const [loading,      setLoading]      = useState(true)
 
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const [tr, pr] = await Promise.all([
+      const [tr, pr, cr] = await Promise.all([
         supabase.from('tasks').select('*').order('created_at', { ascending: false }),
         supabase.from('providers').select('*').eq('active', 1).order('name'),
+        supabase.from('config').select('value').eq('key', 'company_name').single(),
       ])
       setAllTasks(tr.data || [])
       setProviders(pr.data || [])
+      if (cr.data?.value) setCompanyName(cr.data.value)
       setLoading(false)
     }
     load()
@@ -753,15 +818,28 @@ export default function Reports({ showToast }) {
 
   return (
     <div>
-      {/* ── Header ── */}
+      {/* ── Cabeçalho de impressão (oculto na tela) ── */}
+      <ReportPrintHeader
+        periodLabel={periodLabel[period] || period}
+        activeFilters={activeFilters}
+        tasks={tasks}
+        companyName={companyName}
+      />
+
+      {/* ── Header da tela ── */}
       <div className="no-print" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'.75rem', flexWrap:'wrap', gap:'.65rem' }}>
-        <h2 style={{ fontFamily:'var(--mono)', fontSize:'1rem', color:'var(--blue)', letterSpacing:'.04em' }}>
-          📊 RELATÓRIOS
-        </h2>
+        <div style={{ display:'flex', alignItems:'center', gap:'.65rem' }}>
+          <img src="/logo.png" alt="DespachaApp"
+            style={{ height:28, objectFit:'contain' }}
+            onError={e => { e.target.style.display='none' }} />
+          <h2 style={{ fontFamily:'var(--mono)', fontSize:'1rem', color:'var(--blue)', letterSpacing:'.04em', margin:0 }}>
+            📊 RELATÓRIOS
+          </h2>
+        </div>
         <div style={{ display:'flex', alignItems:'center', gap:'.5rem', flexWrap:'wrap' }}>
           <button
             onClick={() => window.print()}
-            style={{ padding:'.4rem .85rem', fontSize:'.82rem', background:'var(--s2)', border:'1px solid var(--border)', borderRadius:6, cursor:'pointer', color:'var(--text)', fontWeight:600 }}
+            style={{ padding:'.4rem .85rem', fontSize:'.82rem', background:'#0f2240', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:600 }}
           >🖨️ Imprimir</button>
           <span style={{ fontSize:'.78rem', color:'var(--muted)', fontFamily:'var(--mono)' }}>
             {tasks.length} tarefa{tasks.length !== 1 ? 's' : ''}

@@ -1148,33 +1148,42 @@ textarea.finput { resize: vertical; min-height: 80px; }
   .lfooter { flex-direction: column; text-align: center; }
 }
 
+/* ── Print-only: oculto na tela, visível na impressão ── */
+.print-only { display: none !important; }
+
 /* ── Impressão / Print ── */
 @media print {
+  /* Mostra elementos de impressão */
+  .print-only { display: block !important; }
+
   /* Oculta elementos de navegação e controle */
   .no-print,
   .sidebar,
   .topbar,
   .stab-bar,
-  .cfg-card:has(.finput),
   nav { display: none !important; }
 
-  body { background: white !important; color: black !important; font-size: 11pt; }
+  body { background: white !important; color: #111 !important; font-size: 10pt; font-family: 'Segoe UI', sans-serif; }
   .main-content, main, #root > div { margin: 0 !important; padding: 0 !important; }
 
-  /* Garante que cards e tabelas quebrem bem */
-  .cfg-card { box-shadow: none !important; border: 1px solid #ccc !important; break-inside: avoid; }
-  table { width: 100% !important; border-collapse: collapse; }
-  th, td { border: 1px solid #ccc !important; padding: 4pt 6pt !important; font-size: 9pt; }
-  thead { background: #f0f4ff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  /* Cards sem sombra */
+  .cfg-card { box-shadow: none !important; border: 1px solid #d1d5db !important; break-inside: avoid; margin-bottom: 12pt !important; }
+  .cfg-title { font-size: 9pt !important; letter-spacing: .06em; color: #1e3a5f !important; border-bottom: 1px solid #e5e7eb; padding-bottom: 4pt; margin-bottom: 8pt; }
 
-  /* Badges coloridos na impressão */
-  .ubadge, .stbadge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  /* Tabelas profissionais */
+  table { width: 100% !important; border-collapse: collapse !important; font-size: 8.5pt; }
+  th { background: #0f2240 !important; color: #fff !important; padding: 5pt 7pt !important; font-weight: 700; text-align: left; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  td { padding: 4pt 7pt !important; border-bottom: 1px solid #e5e7eb !important; vertical-align: middle; }
+  tr:nth-child(even) td { background: #f8fafc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
-  /* Oculta botões de ação dentro dos cards de conteúdo */
-  button:not(.print-show) { display: none !important; }
+  /* Barras coloridas na impressão */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 
-  /* Cabeçalho de impressão com título */
-  h2 { font-size: 14pt !important; margin-bottom: 6pt !important; }
+  /* Oculta botões e inputs */
+  button, input, select { display: none !important; }
 
-  @page { margin: 1.5cm; }
+  /* Grids em colunas normais */
+  .kpi-grid { grid-template-columns: repeat(3, 1fr) !important; }
+
+  @page { margin: 1.2cm 1.5cm; size: A4 portrait; }
 }
