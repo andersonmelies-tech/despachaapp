@@ -290,7 +290,7 @@ function BIDashboard({ tasks, providers }) {
     <div style={{ display:'flex', flexDirection:'column', gap:'.9rem' }}>
 
       {/* ── KPI Strip ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:'.6rem' }}>
+      <div className="bi-kpi-strip" style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:'.6rem' }}>
         {kpis.map(k => (
           <div key={k.label} style={{
             ...card(), padding:'.9rem 1rem',
@@ -309,7 +309,7 @@ function BIDashboard({ tasks, providers }) {
       </div>
 
       {/* ── Charts Triptych ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'1.15fr 1fr 0.95fr', gap:'.9rem' }}>
+      <div className="bi-charts-row" style={{ display:'grid', gridTemplateColumns:'1.15fr 1fr 0.95fr', gap:'.9rem' }}>
 
         {/* Status Donut */}
         <div style={card()}>
@@ -361,10 +361,10 @@ function BIDashboard({ tasks, providers }) {
         </div>
 
         {/* SLA Gauge */}
-        <div style={{ ...card(), display:'flex', flexDirection:'column', alignItems:'center' }}>
+        <div className="bi-sla-card" style={{ ...card(), display:'flex', flexDirection:'column', alignItems:'center' }}>
           <div style={{ ...cardTitle, alignSelf:'flex-start', width:'100%' }}>Índice de SLA</div>
           <HalfGauge pct={slaPct} size={174} />
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'.45rem', width:'100%', marginTop:'.6rem' }}>
+          <div className="bi-sla-stats" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'.45rem', width:'100%', marginTop:'.6rem' }}>
             {[
               { label:'No prazo', val: slaOk,              color: BI.success  },
               { label:'Atrasadas',val: withSla.length-slaOk, color: BI.critical },
@@ -381,7 +381,7 @@ function BIDashboard({ tasks, providers }) {
       </div>
 
       {/* ── Leaderboard + Sectors ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'1.25fr 1fr', gap:'.9rem' }}>
+      <div className="bi-bottom-row" style={{ display:'grid', gridTemplateColumns:'1.25fr 1fr', gap:'.9rem' }}>
 
         {/* Provider Leaderboard */}
         <div style={card()}>

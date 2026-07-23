@@ -1153,37 +1153,119 @@ textarea.finput { resize: vertical; min-height: 80px; }
 
 /* ── Impressão / Print ── */
 @media print {
-  /* Mostra elementos de impressão */
-  .print-only { display: block !important; }
+  @page { margin: 1cm 1.2cm; size: A4 portrait; }
 
-  /* Oculta elementos de navegação e controle */
-  .no-print,
-  .sidebar,
-  .topbar,
-  .stab-bar,
-  nav { display: none !important; }
-
-  body { background: white !important; color: #111 !important; font-size: 10pt; font-family: 'Segoe UI', sans-serif; }
-  .main-content, main, #root > div { margin: 0 !important; padding: 0 !important; }
-
-  /* Cards sem sombra */
-  .cfg-card { box-shadow: none !important; border: 1px solid #d1d5db !important; break-inside: avoid; margin-bottom: 12pt !important; }
-  .cfg-title { font-size: 9pt !important; letter-spacing: .06em; color: #1e3a5f !important; border-bottom: 1px solid #e5e7eb; padding-bottom: 4pt; margin-bottom: 8pt; }
-
-  /* Tabelas profissionais */
-  table { width: 100% !important; border-collapse: collapse !important; font-size: 8.5pt; }
-  th { background: #0f2240 !important; color: #fff !important; padding: 5pt 7pt !important; font-weight: 700; text-align: left; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  td { padding: 4pt 7pt !important; border-bottom: 1px solid #e5e7eb !important; vertical-align: middle; }
-  tr:nth-child(even) td { background: #f8fafc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-
-  /* Barras coloridas na impressão */
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 
-  /* Oculta botões e inputs */
-  button, input, select { display: none !important; }
+  .print-only { display: block !important; }
 
-  /* Grids em colunas normais */
-  .kpi-grid { grid-template-columns: repeat(3, 1fr) !important; }
+  .no-print, .sidebar, .topbar, .stab-bar, nav, button, input, select {
+    display: none !important;
+  }
 
-  @page { margin: 1.2cm 1.5cm; size: A4 portrait; }
+  body {
+    background: white !important;
+    color: #111 !important;
+    font-size: 9pt !important;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    margin: 0 !important;
+  }
+
+  #root, #root > div, .main-content, main {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* ── Cards ── */
+  .cfg-card {
+    box-shadow: none !important;
+    border: 1px solid #d1d5db !important;
+    break-inside: avoid;
+    margin-bottom: 8pt !important;
+    padding: 8pt 10pt !important;
+  }
+  .cfg-title {
+    font-size: 7.5pt !important;
+    letter-spacing: .06em;
+    color: #1e3a5f !important;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 3pt;
+    margin-bottom: 6pt;
+  }
+
+  /* ── Tabelas ── */
+  table { width: 100% !important; border-collapse: collapse !important; font-size: 8pt; }
+  th { background: #0f2240 !important; color: #fff !important; padding: 4pt 6pt !important; font-weight: 700; text-align: left; }
+  td { padding: 3pt 6pt !important; border-bottom: 1px solid #e5e7eb !important; vertical-align: middle; }
+  tr:nth-child(even) td { background: #f8fafc !important; }
+
+  /* ── SVG: escala para caber ── */
+  svg { max-width: 100% !important; height: auto !important; }
+
+  /* ── BI Dashboard: KPI strip ── */
+  .bi-kpi-strip {
+    display: grid !important;
+    grid-template-columns: repeat(6, 1fr) !important;
+    gap: 5pt !important;
+  }
+  .bi-kpi-strip > div {
+    padding: 6pt 7pt !important;
+  }
+  .bi-kpi-strip > div > div:first-child {
+    font-size: 6pt !important;
+  }
+  .bi-kpi-strip > div > div:last-child {
+    font-size: 16pt !important;
+  }
+
+  /* ── BI Dashboard: triptych → 2 colunas (donut + urgência), SLA embaixo ── */
+  .bi-charts-row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 5pt !important;
+  }
+  /* Card SLA ocupa linha inteira em grid de 2 colunas */
+  .bi-sla-card {
+    grid-column: 1 / -1 !important;
+    display: grid !important;
+    grid-template-columns: auto 1fr !important;
+    grid-template-rows: auto auto !important;
+    gap: 2pt 14pt !important;
+    align-items: start !important;
+  }
+  /* Título do SLA ocupa as 2 colunas do grid interno */
+  .bi-sla-card > div:first-child {
+    grid-column: 1 / -1 !important;
+  }
+  /* Gauge SVG: coluna esquerda, linha 2 */
+  .bi-sla-card > svg {
+    grid-row: 2 !important;
+    grid-column: 1 !important;
+    max-width: 140px !important;
+    height: auto !important;
+    align-self: center !important;
+  }
+  /* Stats em 4 colunas horizontais na coluna direita */
+  .bi-sla-stats {
+    grid-template-columns: repeat(4, 1fr) !important;
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    align-self: center !important;
+    margin-top: 0 !important;
+  }
+
+  /* ── BI Dashboard: leaderboard + setores ── */
+  .bi-bottom-row {
+    display: grid !important;
+    grid-template-columns: 1.3fr 1fr !important;
+    gap: 6pt !important;
+    break-before: avoid;
+  }
+
+  /* Fontes menores nas legendas e textos de apoio */
+  .bi-charts-row span, .bi-bottom-row span {
+    font-size: 7.5pt !important;
+  }
 }
