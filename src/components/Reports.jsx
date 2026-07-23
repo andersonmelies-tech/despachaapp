@@ -106,72 +106,48 @@ function DonutChart({ segments, size = 200 }) {
 }
 
 function HalfGauge({ pct, size = 160 }) {
-  // Centro na base do semicírculo, com padding lateral para os labels
-  const pad = size * .12
-  const w   = size + pad * 2
-  const cx  = w / 2
-  const cy  = size * .88
-  const R   = size * .42
-  const sw  = size * .09
+  // Semicírculo vai de LEFT (270° no sistema polar) até RIGHT (90°), passando pelo TOP (0°) no sentido horário
+  const pad = 14
+  const W   = size + pad * 2
+  const cx  = W / 2
+  const cy  = size * 0.52          // linha base do arco
+  const R   = size * 0.40
+  const sw  = size * 0.09
+  const H   = cy + 24              // espaço para os labels de borda
+
   const cap = Math.min(Math.max(pct, 0), 100)
-  // Ângulo: 180° (esquerda) → 0° (direita), mapeado 0–100%
-  const startDeg = 180
-  const endDeg   = 0
-  const valueDeg = 180 - (cap / 100) * 180
   const col = cap >= 80 ? '#00c896' : cap >= 50 ? '#ffb347' : '#ff4d6a'
 
-  // Arco background: da esq (180°) até dir (0°) em sentido horário (sweep=0 no SVG = counter, então usamos largeSweep)
-  const [bgSx, bgSy] = polar(cx, cy, R, startDeg)
-  const [bgEx, bgEy] = polar(cx, cy, R, endDeg)
+  // Pontos fixos do arco
+  const lx = cx - R, rx = cx + R  // extremo esquerdo e direito
 
-  // Arco valor: da esq (180°) até valueDeg
-  const [vEx, vEy] = polar(cx, cy, R, valueDeg)
-  const lg = cap > 50 ? 1 : 0
+  // 0% → 270° (LEFT), 50% → 0° (TOP), 100% → 90° (RIGHT)
+  const vdeg = (270 + cap * 1.8) % 360
+  const [vx, vy] = polar(cx, cy, R, vdeg)
 
-  // Needle dot position
-  const [nx, ny] = polar(cx, cy, R, valueDeg)
-
-  // Tick labels em 0%, 50%, 100%
-  const ticks = [
-    { v: 0,   deg: 180, anchor: 'end'    },
-    { v: 50,  deg: 90,  anchor: 'middle' },
-    { v: 100, deg: 0,   anchor: 'start'  },
-  ]
-
+  // large-arc=0 sempre (nunca ultrapassa 180° neste gauge)
+  // sweep=1 (horário no SVG = vai para cima a partir da esquerda)
   return (
-    <svg width={w} height={size * .6 + 4} viewBox={`0 0 ${w} ${size * .6 + 4}`} style={{ overflow: 'visible' }}>
-      {/* Track */}
-      <path
-        d={`M${bgSx},${bgSy} A${R},${R} 0 0,0 ${bgEx},${bgEy}`}
-        fill="none" stroke="var(--border)" strokeWidth={sw} strokeLinecap="round"
-      />
-      {/* Value arc */}
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+      {/* Trilha de fundo */}
+      <path d={`M${lx},${cy} A${R},${R} 0 0,1 ${rx},${cy}`}
+        fill="none" stroke="var(--border)" strokeWidth={sw} strokeLinecap="round" />
+      {/* Arco preenchido */}
       {cap > 0 && (
-        <path
-          d={`M${bgSx},${bgSy} A${R},${R} 0 ${lg},0 ${vEx},${vEy}`}
+        <path d={`M${lx},${cy} A${R},${R} 0 0,1 ${vx},${vy}`}
           fill="none" stroke={col} strokeWidth={sw} strokeLinecap="round"
-          style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
-        />
+          style={{ WebkitPrintColorAdjust:'exact', printColorAdjust:'exact' }} />
       )}
-      {/* Needle dot */}
-      <circle cx={nx} cy={ny} r={sw * .6} fill="white" stroke={col} strokeWidth={2} />
-
-      {/* Tick labels */}
-      {ticks.map(t => {
-        const [tx, ty] = polar(cx, cy, R + sw * 1.05, t.deg)
-        return (
-          <text key={t.v} x={tx} y={ty + 4} textAnchor={t.anchor}
-            fontSize={size * .058} fill="var(--muted)" fontFamily="inherit">
-            {t.v}%
-          </text>
-        )
-      })}
-
-      {/* Central percentage */}
-      <text x={cx} y={cy - R * .18} textAnchor="middle"
-        fontSize={size * .22} fontWeight="900" fill={col} fontFamily="inherit">
-        {pct}%
-      </text>
+      {/* Ponteiro */}
+      <circle cx={vx} cy={vy} r={sw * 0.65} fill="white" stroke={col} strokeWidth={2.5} />
+      {/* Percentual centralizado */}
+      <text x={cx} y={cy - R * 0.22} textAnchor="middle"
+        fontSize={size * 0.22} fontWeight="900" fill={col} fontFamily="inherit">{pct}%</text>
+      {/* Labels de borda */}
+      <text x={lx + sw * 0.4} y={H - 5} textAnchor="middle"
+        fontSize={size * 0.063} fill="var(--muted)" fontFamily="inherit">0%</text>
+      <text x={rx - sw * 0.4} y={H - 5} textAnchor="middle"
+        fontSize={size * 0.063} fill="var(--muted)" fontFamily="inherit">100%</text>
     </svg>
   )
 }
