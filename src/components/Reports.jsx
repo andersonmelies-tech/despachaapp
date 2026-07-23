@@ -651,14 +651,25 @@ const PERIODS = [
   { id: 'custom', label: 'Personalizado' },
 ]
 
+const STA_OPTIONS = ['cadastrada','pendente','em_andamento','prestador_externo','concluida','cancelada']
+const STA_LABELS  = { cadastrada:'Cadastrada', pendente:'Pendente', em_andamento:'Em andamento', prestador_externo:'Prestador Externo', concluida:'Concluída', cancelada:'Cancelada' }
+const URG_OPTIONS = ['critica','alta','media','baixa']
+const URG_LABELS  = { critica:'Crítica', alta:'Alta', media:'Média', baixa:'Baixa' }
+
+const sel = { width:'auto', padding:'.4rem .65rem', fontSize:'.82rem' }
+
 export default function Reports({ showToast }) {
-  const [tab,        setTab]        = useState('overview')
-  const [period,     setPeriod]     = useState('30d')
-  const [customFrom, setCustomFrom] = useState('')
-  const [customTo,   setCustomTo]   = useState('')
-  const [allTasks,   setAllTasks]   = useState([])
-  const [providers,  setProviders]  = useState([])
-  const [loading,    setLoading]    = useState(true)
+  const [tab,          setTab]          = useState('overview')
+  const [period,       setPeriod]       = useState('30d')
+  const [customFrom,   setCustomFrom]   = useState('')
+  const [customTo,     setCustomTo]     = useState('')
+  const [fSector,      setFSector]      = useState('')
+  const [fProvider,    setFProvider]    = useState('')
+  const [fStatus,      setFStatus]      = useState('')
+  const [fUrgency,     setFUrgency]     = useState('')
+  const [allTasks,     setAllTasks]     = useState([])
+  const [providers,    setProviders]    = useState([])
+  const [loading,      setLoading]      = useState(true)
 
   useEffect(() => {
     async function load() {
@@ -674,69 +685,115 @@ export default function Reports({ showToast }) {
     load()
   }, [])
 
+  const sectors = useMemo(() =>
+    [...new Set(allTasks.map(t => t.sector).filter(Boolean))].sort()
+  , [allTasks])
+
   const tasks = useMemo(() => {
     const start = getPeriodStart(period, customFrom)
     const end   = period === 'custom' && customTo ? new Date(customTo + 'T23:59:59') : null
-
     return allTasks.filter(t => {
       const d = new Date(t.created_at)
       if (start && d < start) return false
       if (end   && d > end)   return false
+      if (fSector   && t.sector      !== fSector)                      return false
+      if (fProvider && String(t.assignee_id) !== fProvider)            return false
+      if (fStatus   && t.status      !== fStatus)                      return false
+      if (fUrgency  && t.urgency     !== fUrgency)                     return false
       return true
     })
-  }, [allTasks, period, customFrom, customTo])
+  }, [allTasks, period, customFrom, customTo, fSector, fProvider, fStatus, fUrgency])
+
+  const hasFilter = fSector || fProvider || fStatus || fUrgency
+  function clearFilters() { setFSector(''); setFProvider(''); setFStatus(''); setFUrgency('') }
+
+  const periodLabel = { hoje:'Hoje', '7d':'Últimos 7 dias', '30d':'Últimos 30 dias', '90d':'Últimos 90 dias', custom:'Personalizado' }
+  const activeFilters = [
+    fSector   && `Setor: ${fSector}`,
+    fProvider && `Colaborador: ${providers.find(p=>String(p.id)===fProvider)?.name}`,
+    fStatus   && `Status: ${STA_LABELS[fStatus]}`,
+    fUrgency  && `Urgência: ${URG_LABELS[fUrgency]}`,
+  ].filter(Boolean)
 
   return (
     <div>
       {/* ── Header ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '.65rem' }}>
-        <h2 style={{ fontFamily: 'var(--mono)', fontSize: '1rem', color: 'var(--blue)', letterSpacing: '.04em' }}>
+      <div className="no-print" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'.75rem', flexWrap:'wrap', gap:'.65rem' }}>
+        <h2 style={{ fontFamily:'var(--mono)', fontSize:'1rem', color:'var(--blue)', letterSpacing:'.04em' }}>
           📊 RELATÓRIOS
         </h2>
-
-        {/* Filtro de período */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
-          <select
-            className="finput"
-            style={{ width: 'auto', padding: '.4rem .65rem', fontSize: '.82rem' }}
-            value={period}
-            onChange={e => setPeriod(e.target.value)}
-          >
-            {PERIODS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-          </select>
-          {period === 'custom' && (
-            <>
-              <input
-                type="date"
-                className="finput"
-                style={{ width: 'auto', padding: '.4rem .65rem', fontSize: '.82rem' }}
-                value={customFrom}
-                onChange={e => setCustomFrom(e.target.value)}
-              />
-              <span style={{ color: 'var(--muted)', fontSize: '.82rem' }}>até</span>
-              <input
-                type="date"
-                className="finput"
-                style={{ width: 'auto', padding: '.4rem .65rem', fontSize: '.82rem' }}
-                value={customTo}
-                onChange={e => setCustomTo(e.target.value)}
-              />
-            </>
-          )}
-          <span style={{ fontSize: '.78rem', color: 'var(--muted)', fontFamily: 'var(--mono)' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:'.5rem', flexWrap:'wrap' }}>
+          <button
+            onClick={() => window.print()}
+            style={{ padding:'.4rem .85rem', fontSize:'.82rem', background:'var(--s2)', border:'1px solid var(--border)', borderRadius:6, cursor:'pointer', color:'var(--text)', fontWeight:600 }}
+          >🖨️ Imprimir</button>
+          <span style={{ fontSize:'.78rem', color:'var(--muted)', fontFamily:'var(--mono)' }}>
             {tasks.length} tarefa{tasks.length !== 1 ? 's' : ''}
           </span>
         </div>
       </div>
 
+      {/* ── Filtros ── */}
+      <div className="no-print cfg-card" style={{ marginBottom:'1rem', display:'flex', flexWrap:'wrap', gap:'.6rem', alignItems:'center' }}>
+        {/* Período */}
+        <select className="finput" style={sel} value={period} onChange={e => setPeriod(e.target.value)}>
+          {PERIODS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+        </select>
+        {period === 'custom' && (<>
+          <input type="date" className="finput" style={sel} value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
+          <span style={{ color:'var(--muted)', fontSize:'.82rem' }}>até</span>
+          <input type="date" className="finput" style={sel} value={customTo}   onChange={e => setCustomTo(e.target.value)} />
+        </>)}
+
+        <div style={{ width:1, height:24, background:'var(--border)', flexShrink:0 }} />
+
+        {/* Setor */}
+        <select className="finput" style={sel} value={fSector} onChange={e => setFSector(e.target.value)}>
+          <option value="">Todos os setores</option>
+          {sectors.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+
+        {/* Colaborador */}
+        <select className="finput" style={sel} value={fProvider} onChange={e => setFProvider(e.target.value)}>
+          <option value="">Todos os colaboradores</option>
+          {providers.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+        </select>
+
+        {/* Status */}
+        <select className="finput" style={sel} value={fStatus} onChange={e => setFStatus(e.target.value)}>
+          <option value="">Todos os status</option>
+          {STA_OPTIONS.map(s => <option key={s} value={s}>{STA_LABELS[s]}</option>)}
+        </select>
+
+        {/* Urgência */}
+        <select className="finput" style={sel} value={fUrgency} onChange={e => setFUrgency(e.target.value)}>
+          <option value="">Todas as urgências</option>
+          {URG_OPTIONS.map(u => <option key={u} value={u}>{URG_LABELS[u]}</option>)}
+        </select>
+
+        {hasFilter && (
+          <button onClick={clearFilters} style={{ padding:'.4rem .75rem', fontSize:'.78rem', background:'#fef2f2', color:'var(--red)', border:'1px solid #fca5a5', borderRadius:6, cursor:'pointer', fontWeight:600 }}>
+            ✕ Limpar filtros
+          </button>
+        )}
+      </div>
+
+      {/* Resumo dos filtros ativos — aparece na impressão */}
+      {activeFilters.length > 0 && (
+        <div style={{ fontSize:'.78rem', color:'var(--muted)', marginBottom:'.75rem', display:'flex', gap:'.5rem', flexWrap:'wrap' }}>
+          <span style={{ fontWeight:600, color:'var(--text)' }}>Filtros:</span>
+          {activeFilters.map(f => (
+            <span key={f} style={{ background:'var(--s2)', padding:'.15rem .55rem', borderRadius:20, border:'1px solid var(--border)' }}>{f}</span>
+          ))}
+          <span>· Período: {periodLabel[period] || period}</span>
+          <span>· {tasks.length} tarefa{tasks.length !== 1?'s':''}</span>
+        </div>
+      )}
+
       {/* ── Tabs ── */}
-      <div className="stab-bar" style={{ marginBottom: '1.25rem' }}>
+      <div className="stab-bar no-print" style={{ marginBottom:'1.25rem' }}>
         {TABS.map(t => (
-          <button
-            key={t.id}
-            className={`stab${tab === t.id ? ' active' : ''}`}
-            onClick={() => setTab(t.id)}
-          >
+          <button key={t.id} className={`stab${tab === t.id ? ' active' : ''}`} onClick={() => setTab(t.id)}>
             {t.label}
           </button>
         ))}
