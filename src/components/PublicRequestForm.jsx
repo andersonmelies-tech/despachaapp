@@ -104,6 +104,8 @@ export default function PublicRequestForm() {
       ? (f.locationCustom?.trim() || null)
       : (f.location?.trim() || null)
 
+    if (!locationValue) return setError('Selecione ou informe o local/setor do problema.')
+
     setSending(true)
     try {
       const res = await fetch('/api/public/request', {
@@ -336,7 +338,7 @@ export default function PublicRequestForm() {
 
           {/* Local / Setor */}
           <div style={styles.field}>
-            <label style={styles.label}>LOCAL / SETOR DO PROBLEMA</label>
+            <label style={styles.label}>LOCAL / SETOR DO PROBLEMA *</label>
             {sectors.length > 0 ? (
               <select
                 style={{ ...styles.input, cursor: 'pointer', color: f.location ? '#1a1a2e' : '#9ca3af' }}

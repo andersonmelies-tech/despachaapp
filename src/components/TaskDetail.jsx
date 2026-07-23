@@ -122,6 +122,7 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
     if (!f.title.trim()) return alert('Título obrigatório')
     if (!f.requester.trim()) return alert('Solicitante obrigatório')
     if (!f.assignee.trim()) return alert('Prestador obrigatório')
+    if (!f.sector) return alert('Setor da tarefa obrigatório')
     setSaving(true)
 
     // ── CRIAÇÃO COM RECORRÊNCIA ──────────────────────────────────────────────

@@ -77,6 +77,7 @@ function RecurrenceModal({ rec, providers, sectors, onClose, onSave, showToast }
     if (!f.title.trim())    return showToast('Título obrigatório', 'err')
     if (!f.requester.trim()) return showToast('Solicitante obrigatório', 'err')
     if (!f.assignee.trim()) return showToast('Colaborador obrigatório', 'err')
+    if (!f.sector)          return showToast('Setor da tarefa obrigatório', 'err')
     if (f.frequency === 'weekly_custom' && f.days_of_week.length === 0)
       return showToast('Selecione pelo menos um dia da semana', 'err')
     setSaving(true)
@@ -172,8 +173,17 @@ function RecurrenceModal({ rec, providers, sectors, onClose, onSave, showToast }
 
             {/* Setor solicitante */}
             <div className="fg">
-              <label className="flabel">SETOR</label>
+              <label className="flabel">SETOR DO SOLICITANTE</label>
               <select className="finput" value={f.requester_sector} onChange={e => set('requester_sector', e.target.value)}>
+                <option value="">Selecione...</option>
+                {sectors.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+              </select>
+            </div>
+
+            {/* Setor da tarefa */}
+            <div className="fg">
+              <label className="flabel">SETOR DA TAREFA *</label>
+              <select className="finput" value={f.sector} onChange={e => set('sector', e.target.value)}>
                 <option value="">Selecione...</option>
                 {sectors.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
               </select>
