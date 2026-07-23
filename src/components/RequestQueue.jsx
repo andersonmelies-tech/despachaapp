@@ -264,41 +264,44 @@ export default function RequestQueue({ showToast, onCountChange }) {
 
   async function approve(req, formData) {
     setSaving(true)
-    const prov     = providers.find(p => p.id === Number(formData.assignee_id))
-    const hours    = SLA_HOURS[formData.urgency] || 24
-    const startDt  = formData.scheduled_start ? new Date(formData.scheduled_start) : new Date()
-    if (isNaN(startDt.getTime())) {
-      showToast('Data de início inválida. Verifique o ano digitado.', 'err')
-      setSaving(false)
-      return
-    }
-    const slaDt    = addHours(startDt, hours)
-    const fmt      = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' })
+    try {
+      const prov  = providers.find(p => p.id === Number(formData.assignee_id))
+      const hours = SLA_HOURS[formData.urgency] || 24
+      const startDt = formData.scheduled_start ? new Date(formData.scheduled_start) : new Date()
+      if (isNaN(startDt.getTime())) {
+        showToast('Data de início inválida. Verifique o ano digitado.', 'err')
+        return
+      }
+      const slaDt = addHours(startDt, hours)
+      const fmt   = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' })
 
-    const updates = {
-      needs_approval:    false,
-      assignee_id:       Number(formData.assignee_id),
-      assignee:          prov?.name || '',
-      urgency:           formData.urgency,
-      provider_notified: false,
-      scheduled_start:   startDt.toISOString(),
-      sla_deadline:      slaDt.toISOString(),
-      due_date:          fmt.format(slaDt),
-      ...(formData.notes && { notes: formData.notes.trim() }),
+      const updates = {
+        needs_approval:    false,
+        assignee_id:       Number(formData.assignee_id),
+        assignee:          prov?.name || '',
+        urgency:           formData.urgency,
+        provider_notified: false,
+        scheduled_start:   startDt.toISOString(),
+        sla_deadline:      slaDt.toISOString(),
+        due_date:          fmt.format(slaDt),
+        ...(formData.notes && { notes: formData.notes.trim() }),
+      }
+      const { error } = await supabase.from('tasks').update(updates).eq('id', req.id)
+      if (error) { showToast('Erro: ' + error.message, 'err'); return }
+      fetch('/api/telegram/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_id: req.id }),
+      }).catch(() => {})
+      showToast(`Solicitação #${req.id} aprovada e enviada para ${prov?.name} ✓`)
+      setApproving(null)
+      _rqc.loaded = false
+      load()
+    } catch (e) {
+      showToast('Erro inesperado: ' + e.message, 'err')
+    } finally {
+      setSaving(false)
     }
-    const { error } = await supabase.from('tasks').update(updates).eq('id', req.id)
-    if (error) { showToast('Erro: ' + error.message, 'err'); setSaving(false); return }
-    // Notifica via Telegram
-    fetch('/api/telegram/notify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ task_id: req.id }),
-    }).catch(() => {})
-    showToast(`Solicitação #${req.id} aprovada e enviada para ${prov?.name} ✓`)
-    setSaving(false)
-    setApproving(null)
-    _rqc.loaded = false
-    load()
   }
 
   async function reject(req) {
