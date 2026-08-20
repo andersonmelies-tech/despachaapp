@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { supabase, calcSlaDeadline, isoToLocalDate, isOverdue } from '../lib/supabase.js'
+import { supabase, calcSlaDeadline, isoToLocalDate, isOverdue, uploadTaskPhoto } from '../lib/supabase.js'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 export const URG_LABEL = { critica: '🚨 Crítica', alta: '🔴 Alta', media: '🟡 Média', baixa: '🟢 Baixa' }
@@ -94,7 +94,8 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
   async function addPhotos(files) {
     const newPhotos = []
     for (const file of files) {
-      const compressed = await new Promise(resolve => {
+      // Comprime para base64
+      const base64 = await new Promise(resolve => {
         const img = new Image()
         const url = URL.createObjectURL(file)
         img.onload = () => {
@@ -113,7 +114,10 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
         img.onerror = () => { URL.revokeObjectURL(url); resolve(null) }
         img.src = url
       })
-      if (compressed) newPhotos.push(compressed)
+      if (!base64) continue
+      // Envia ao Storage e guarda URL pública (evita base64 no banco)
+      const url = await uploadTaskPhoto(base64, 'tasks')
+      newPhotos.push(url || base64) // fallback para base64 se o upload falhar
     }
     setF(prev => ({ ...prev, photos: [...prev.photos, ...newPhotos] }))
   }

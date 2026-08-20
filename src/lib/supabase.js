@@ -56,6 +56,23 @@ export function isOverdue(task) {
   return (due && due < now) || (sla && sla < now)
 }
 
+// ── Storage: upload de foto de tarefa ────────────────────────────────────────
+// Converte base64 em Blob e envia ao bucket task-photos.
+// Retorna a URL pública ou null em caso de erro.
+export async function uploadTaskPhoto(base64, prefix = 'task') {
+  try {
+    const [meta, data] = base64.split(',')
+    const mime = meta.match(/:(.*?);/)?.[1] || 'image/jpeg'
+    const ext  = mime === 'image/png' ? 'png' : 'jpg'
+    const bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0))
+    const blob  = new Blob([bytes], { type: mime })
+    const path  = `${prefix}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+    const { error } = await supabase.storage.from('task-photos').upload(path, blob, { contentType: mime, upsert: false })
+    if (error) return null
+    return supabase.storage.from('task-photos').getPublicUrl(path).data.publicUrl
+  } catch { return null }
+}
+
 // ── Stat query ────────────────────────────────────────────────────────────────
 // Seleciona APENAS as colunas necessárias para o cálculo — evita baixar
 // photos (base64), description, requester_phone, etc.

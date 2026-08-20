@@ -4,6 +4,7 @@
  * Sem autenticação — qualquer pessoa pode abrir chamado
  */
 import { useState, useRef, useEffect } from 'react'
+import { uploadTaskPhoto } from '../lib/supabase.js'
 
 // Comprime imagem — 3 estratégias em cascata para máxima compatibilidade mobile
 async function compressImage(file, maxPx = 800, quality = 0.65) {
@@ -108,6 +109,16 @@ export default function PublicRequestForm() {
 
     setSending(true)
     try {
+      // Envia cada foto ao Storage e substitui base64 por URL pública
+      let photoUrls = null
+      if (photos.length) {
+        const uploaded = await Promise.all(
+          photos.map(b64 => uploadTaskPhoto(b64, 'public'))
+        )
+        // Se algum upload falhou, usa base64 como fallback
+        photoUrls = uploaded.map((url, i) => url || photos[i])
+      }
+
       const res = await fetch('/api/public/request', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -118,7 +129,7 @@ export default function PublicRequestForm() {
           location:         locationValue,
           category:         f.category?.trim() || null,
           description:      f.description.trim(),
-          photos:           photos.length ? photos : null,
+          photos:           photoUrls,
           invite_code:      inviteCode,
         }),
       })
