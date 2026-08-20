@@ -1002,8 +1002,8 @@ export default function Reports({ showToast }) {
     async function load() {
       setLoading(true)
       const [tr, pr, cr] = await Promise.all([
-        supabase.from('tasks').select('*').order('created_at', { ascending: false }),
-        supabase.from('providers').select('*').eq('active', 1).order('name'),
+        supabase.from('tasks').select('id,title,status,urgency,sector,assignee_id,created_at,due_date,completed_at,sla_deadline,elapsed_minutes,source,recurrence_id').order('created_at', { ascending: false }),
+        supabase.from('providers').select('id,name').eq('active', 1).order('name'),
         supabase.from('config').select('value').eq('key', 'company_name').single(),
       ])
       setAllTasks(tr.data || [])

@@ -16,7 +16,7 @@ export default function Calendar({ showToast }) {
   useEffect(() => {
     const start = new Date(year, month, 1).toISOString().split('T')[0]
     const end   = new Date(year, month + 1, 0).toISOString().split('T')[0]
-    supabase.from('tasks').select('*').gte('due_date', start).lte('due_date', end)
+    supabase.from('tasks').select('id,title,status,urgency,sector,assignee_id,due_date,completed_at,elapsed_minutes,recurrence_id').gte('due_date', start).lte('due_date', end)
       .then(r => setTasks(r.data || []))
   }, [year, month])
 
@@ -40,7 +40,7 @@ export default function Calendar({ showToast }) {
   async function reloadDay() {
     const start = new Date(year, month, 1).toISOString().split('T')[0]
     const end   = new Date(year, month + 1, 0).toISOString().split('T')[0]
-    const { data } = await supabase.from('tasks').select('*').gte('due_date', start).lte('due_date', end)
+    const { data } = await supabase.from('tasks').select('id,title,status,urgency,sector,assignee_id,due_date,completed_at,elapsed_minutes,recurrence_id').gte('due_date', start).lte('due_date', end)
     setTasks(data || [])
   }
 

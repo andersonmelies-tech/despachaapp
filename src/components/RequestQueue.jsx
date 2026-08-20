@@ -200,7 +200,7 @@ export default function RequestQueue({ showToast, onCountChange }) {
   async function load() {
     if (!_rqc.loaded) setLoading(true)
     const [rr, pr, cr, sr] = await Promise.all([
-      supabase.from('tasks').select('*')
+      supabase.from('tasks').select('id,title,description,status,urgency,sector,requester,requester_sector,location,assignee_id,created_at,due_date,notes,photos')
         .eq('source', 'publico').eq('needs_approval', true)
         .neq('status', 'cancelada')
         .order('id', { ascending: false }),
@@ -222,7 +222,7 @@ export default function RequestQueue({ showToast, onCountChange }) {
   }
 
   async function loadHistory() {
-    const { data } = await supabase.from('tasks').select('*')
+    const { data } = await supabase.from('tasks').select('id,title,description,status,urgency,sector,requester,requester_sector,location,assignee_id,created_at,due_date,notes,photos')
       .eq('source', 'publico').eq('needs_approval', false)
       .neq('status', 'cancelada')
       .order('id', { ascending: false }).limit(50)
