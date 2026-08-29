@@ -27,7 +27,7 @@ export default async function handler(request) {
 
     let query = supabase
       .from('tasks')
-      .select('*', { count: 'exact' })
+      .select('id,title,status,urgency,sector,assignee_id,created_at,due_date,completed_at,sla_deadline,elapsed_minutes,source,recurrence_id,needs_approval,requester,requester_sector,client_name,client_address,task_type,client_id,description', { count: 'exact' })
       .eq('company_id', company.id)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)

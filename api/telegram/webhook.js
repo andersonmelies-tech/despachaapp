@@ -199,7 +199,7 @@ function backMenuKb() {
 
 // ── Tasks query ───────────────────────────────────────────────────────────────
 async function getTasks({ provId, companyId, status, urgency, overdue, search } = {}) {
-  let q = sb.from('tasks').select('*')
+  let q = sb.from('tasks').select('id,title,description,status,urgency,sector,assignee_id,created_at,due_date,completed_at,sla_deadline,elapsed_minutes,requester,location,notes,company_id')
   if (companyId) q = q.eq('company_id', companyId)
   if (provId)    q = q.eq('assignee_id', provId)
   if (Array.isArray(status)) q = q.in('status', status)
