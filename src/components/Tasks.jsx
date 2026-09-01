@@ -48,8 +48,12 @@ export default function Tasks({ showToast, sideFilter, user, plan, onStatsChange
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tasks' },
         ({ new: t }) => {
           if (!mountedRef.current) return
-          // Toast apenas para eventos externos (Telegram / formulário público)
-          if (t.source === 'publico') showToast(`📥 Nova solicitação de ${t.requester}`)
+          // Tarefas aguardando aprovação vão para a fila — não entram na lista principal
+          if (t.needs_approval) {
+            if (t.source === 'publico') showToast(`📥 Nova solicitação de ${t.requester} — aprovar na Fila de Pedidos`)
+            onStatsChange?.()
+            return
+          }
           _cache.tasks = [t, ..._cache.tasks]
           setTasks([..._cache.tasks])
           onStatsChange?.()
@@ -58,6 +62,16 @@ export default function Tasks({ showToast, sideFilter, user, plan, onStatsChange
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tasks' },
         ({ new: t, old: o }) => {
           if (!mountedRef.current) return
+          const alreadyInList = _cache.tasks.some(x => x.id === t.id)
+          // Tarefa acabou de ser aprovada — adiciona à lista principal
+          if (!t.needs_approval && o.needs_approval && !alreadyInList) {
+            _cache.tasks = [t, ..._cache.tasks]
+            setTasks([..._cache.tasks])
+            onStatsChange?.()
+            return
+          }
+          // Tarefa ainda aguarda aprovação — não exibir na lista
+          if (t.needs_approval) { onStatsChange?.(); return }
           // Notificações de ações do colaborador via Telegram
           if (t.provider_obs && t.provider_obs !== o.provider_obs)
             showToast(`💬 ${t.assignee} comentou na tarefa #${t.id}`)
@@ -106,7 +120,7 @@ export default function Tasks({ showToast, sideFilter, user, plan, onStatsChange
     // são carregadas sob demanda quando o usuário abre o detalhe da tarefa
     const LIST_COLS = 'id,title,status,urgency,due_date,sla_deadline,created_at,assignee,assignee_id,sector,source,needs_approval,requester,requester_phone,requester_sector,elapsed_minutes,recurrence_id,provider_new_date,company_id'
     const [tr, pr, sr, slr] = await Promise.all([
-      supabase.from('tasks').select(LIST_COLS).order('id', { ascending: false }),
+      supabase.from('tasks').select(LIST_COLS).or('needs_approval.is.null,needs_approval.eq.false').order('id', { ascending: false }),
       supabase.from('providers').select('id,name,chat_id,active').eq('active', 1),
       supabase.from('sectors').select('id,name,active').eq('active', 1).order('name'),
       supabase.from('sla_config').select('*'),

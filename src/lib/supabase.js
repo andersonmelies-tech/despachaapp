@@ -90,7 +90,7 @@ function setStatsCache(data) {
 export async function fetchStats() {
   // Queries em paralelo — tasks + providers ao mesmo tempo
   const [{ data: tasks }, { data: provs }] = await Promise.all([
-    supabase.from('tasks').select(STATS_COLS),
+    supabase.from('tasks').select(STATS_COLS).or('needs_approval.is.null,needs_approval.eq.false'),
     supabase.from('providers').select('id,name,chat_id').eq('active', 1),
   ])
   if (!tasks) return null
