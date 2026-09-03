@@ -1,11 +1,9 @@
-import { createClient } from '@supabase/supabase-js'
+import { makeDb } from '../v1/_auth.js'
 
 export const config = { runtime: 'edge' }
 
-const SK          = process.env.STRIPE_SECRET_KEY
-const WH_SECRET   = process.env.STRIPE_WEBHOOK_SECRET
-const SB_URL      = process.env.SUPABASE_URL
-const SB_SERVICE  = process.env.SUPABASE_SERVICE_KEY
+const SK        = process.env.STRIPE_SECRET_KEY
+const WH_SECRET = process.env.STRIPE_WEBHOOK_SECRET
 
 const PLAN_MAP = {
   'price_1TPRCsGsVnzNJmCnvEK08gWJ': 'starter',
@@ -51,7 +49,7 @@ export default async function handler(req) {
   let event
   try { event = JSON.parse(body) } catch { return new Response('Invalid JSON', { status: 400 }) }
 
-  const sb = createClient(SB_URL, SB_SERVICE)
+  const sb = makeDb()
 
   const obj = event.data?.object
 

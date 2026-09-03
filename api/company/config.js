@@ -1,6 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
-
 export const config = { runtime: 'edge' }
+
+const SB_URL     = (process.env.SUPABASE_URL          || '').trim()
+const SB_ANON    = (process.env.SUPABASE_ANON_KEY     || '').trim()
+const SB_SERVICE = (process.env.SUPABASE_SERVICE_KEY  || '').trim()
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -14,30 +16,29 @@ function json(body, status = 200) {
   })
 }
 
-// Salva pares chave/valor na tabela config da empresa do usuário autenticado.
-// Usa service role — a tabela config tem RLS que bloqueia escrita pelo cliente,
-// por isso todas as gravações de config passam pelo servidor.
+function svcHeaders() {
+  return { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json', Prefer: 'return=representation' }
+}
+
 export default async function handler(req) {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
   if (req.method !== 'POST')   return json({ error: 'Method not allowed' }, 405)
 
-  const url     = process.env.SUPABASE_URL
-  const service = process.env.SUPABASE_SERVICE_KEY
-  const anon    = process.env.SUPABASE_ANON_KEY
-
-  const token = (req.headers.get('authorization') || '').replace('Bearer ', '')
+  const token = (req.headers.get('authorization') || '').replace('Bearer ', '').trim()
   if (!token) return json({ error: 'Unauthorized' }, 401)
 
-  const sbAuth = createClient(url, anon)
-  const { data: { user }, error: authErr } = await sbAuth.auth.getUser(token)
-  if (authErr || !user) return json({ error: 'Unauthorized' }, 401)
-
-  const sb = createClient(url, service)
+  const authRes = await fetch(`${SB_URL}/auth/v1/user`, {
+    headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` }
+  })
+  if (!authRes.ok) return json({ error: 'Unauthorized' }, 401)
+  const user = await authRes.json()
+  if (!user?.id) return json({ error: 'Unauthorized' }, 401)
 
   let company_id = user.user_metadata?.company_id
   if (!company_id) {
-    const { data: co } = await sb.from('companies').select('id').limit(1).maybeSingle()
-    company_id = co?.id
+    const r = await fetch(`${SB_URL}/rest/v1/companies?select=id&limit=1`, { headers: svcHeaders() })
+    const rows = r.ok ? await r.json() : []
+    company_id = rows?.[0]?.id
   }
   if (!company_id) return json({ error: 'company_id not found' }, 400)
 
@@ -51,19 +52,22 @@ export default async function handler(req) {
 
   if (!rows.length) return json({ error: 'Nenhuma configuração válida informada' }, 400)
 
-  // UPDATE por key e, se não existir, INSERT — mesmo padrão do branding.
-  // (o banco não tem a constraint composta (key, company_id) para usar ON CONFLICT)
   for (const row of rows) {
-    const { data, error: updErr } = await sb
-      .from('config')
-      .update({ value: row.value, company_id })
-      .eq('key', row.key)
-      .select('key')
-    if (updErr) return json({ error: updErr.message }, 500)
+    const patchRes = await fetch(
+      `${SB_URL}/rest/v1/config?key=eq.${encodeURIComponent(row.key)}`,
+      { method: 'PATCH', headers: svcHeaders(), body: JSON.stringify({ value: row.value, company_id }) }
+    )
+    const patchData = patchRes.ok ? await patchRes.json() : []
 
-    if (!data || data.length === 0) {
-      const { error: insErr } = await sb.from('config').insert({ key: row.key, value: row.value, company_id })
-      if (insErr) return json({ error: insErr.message }, 500)
+    if (!Array.isArray(patchData) || patchData.length === 0) {
+      const insRes = await fetch(`${SB_URL}/rest/v1/config`, {
+        method: 'POST', headers: svcHeaders(),
+        body: JSON.stringify({ key: row.key, value: row.value, company_id })
+      })
+      if (!insRes.ok) {
+        const e = await insRes.json().catch(() => ({}))
+        return json({ error: e?.message || 'Insert failed' }, 500)
+      }
     }
   }
 

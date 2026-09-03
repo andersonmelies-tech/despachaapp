@@ -13,16 +13,13 @@
  *   { record: { ...task } }           — payload do Supabase database webhook
  *   {}                                — varre todas as tarefas não notificadas (fallback)
  */
-import { createClient } from '@supabase/supabase-js'
+import { makeDb } from '../v1/_auth.js'
 
 export const config = { runtime: 'edge' }
 
 const TOKEN = process.env.TELEGRAM_TOKEN || ''
 const TG    = `https://api.telegram.org/bot${TOKEN}`
-const sb    = createClient(
-  process.env.SUPABASE_URL    || '',
-  process.env.SUPABASE_SERVICE_KEY || ''
-)
+const sb    = makeDb()
 
 const URG = { critica: '🚨 CRÍTICA', alta: '🔴 Alta', media: '🟡 Média', baixa: '🟢 Baixa' }
 

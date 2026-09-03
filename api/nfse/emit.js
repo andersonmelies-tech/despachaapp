@@ -1,10 +1,10 @@
-import { createClient } from '@supabase/supabase-js'
+import { makeDb } from '../v1/_auth.js'
 
 export const config = { runtime: 'edge' }
 
-const SB_URL     = process.env.SUPABASE_URL
-const SB_ANON   = process.env.SUPABASE_ANON_KEY
-const SB_SERVICE = process.env.SUPABASE_SERVICE_KEY
+const SB_URL     = (process.env.SUPABASE_URL          || '').trim()
+const SB_ANON    = (process.env.SUPABASE_ANON_KEY     || '').trim()
+const SB_SERVICE = (process.env.SUPABASE_SERVICE_KEY  || '').trim()
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -34,10 +34,11 @@ export default async function handler(req) {
   const token = (req.headers.get('Authorization') || '').replace('Bearer ', '')
   if (!token) return json({ error: 'Unauthorized' }, 401)
 
-  const sbAnon = createClient(SB_URL, SB_ANON, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
+  const authRes = await fetch(`${SB_URL}/auth/v1/user`, {
+    headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` }
   })
-  const { data: { user } } = await sbAnon.auth.getUser()
+  if (!authRes.ok) return json({ error: 'Unauthorized' }, 401)
+  const user = await authRes.json()
   if (!user) return json({ error: 'Unauthorized' }, 401)
 
   const company_id = user.user_metadata?.company_id
@@ -47,7 +48,7 @@ export default async function handler(req) {
   const { service_order_id } = await req.json()
   if (!service_order_id) return json({ error: 'service_order_id obrigatório' }, 400)
 
-  const sbSvc = createClient(SB_URL, SB_SERVICE)
+  const sbSvc = makeDb()
 
   // ── Busca a OS ────────────────────────────────────────────────────
   const { data: os, error: osErr } = await sbSvc

@@ -1,11 +1,7 @@
-/**
- * DespachaApp — API pública para solicitações de serviço
- * Chamado pelo formulário público /solicitar (sem autenticação)
- * Usa service_role key para bypass de RLS
- */
-import { createClient } from '@supabase/supabase-js'
-
 export const config = { runtime: 'edge' }
+
+const SB_URL     = (process.env.SUPABASE_URL          || '').trim()
+const SB_SERVICE = (process.env.SUPABASE_SERVICE_KEY  || '').trim()
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -15,9 +11,31 @@ const CORS = {
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...CORS },
+    status, headers: { 'Content-Type': 'application/json', ...CORS }
   })
+}
+
+function svcHeaders() {
+  return {
+    apikey:         SB_SERVICE,
+    Authorization:  `Bearer ${SB_SERVICE}`,
+    'Content-Type': 'application/json',
+    Prefer:         'return=representation',
+  }
+}
+
+async function restGet(path) {
+  const r = await fetch(`${SB_URL}/rest/v1/${path}`, { headers: svcHeaders() })
+  return r.ok ? r.json() : null
+}
+
+async function restPost(table, payload) {
+  const r = await fetch(`${SB_URL}/rest/v1/${table}`, {
+    method: 'POST', headers: svcHeaders(), body: JSON.stringify(payload)
+  })
+  const data = await r.json()
+  if (!r.ok) return { data: null, error: { message: data?.message || data?.error || String(r.status) } }
+  return { data: Array.isArray(data) ? data[0] : data, error: null }
 }
 
 export default async function handler(req) {
@@ -33,34 +51,24 @@ export default async function handler(req) {
   if (!description?.trim()) return json({ error: 'Descrição obrigatória' }, 400)
   if (!phone?.trim())       return json({ error: 'Telefone obrigatório' }, 400)
 
-  const sb = createClient(
-    process.env.SUPABASE_URL        || '',
-    process.env.SUPABASE_SERVICE_KEY || ''
-  )
-
-  // Resolve company_id pelo invite_code ou pega a primeira empresa
+  // Resolve company_id pelo invite_code
   let company_id = null
   if (invite_code) {
-    const { data: co } = await sb.from('companies').select('id')
-      .eq('invite_code', invite_code).eq('active', true).maybeSingle()
-    company_id = co?.id
+    const rows = await restGet(`companies?select=id&invite_code=eq.${encodeURIComponent(invite_code)}&limit=1`)
+    company_id = rows?.[0]?.id
   }
   if (!company_id) {
-    const { data: co } = await sb.from('companies').select('id').limit(1).maybeSingle()
-    company_id = co?.id
+    const rows = await restGet('companies?select=id&limit=1')
+    company_id = rows?.[0]?.id
   }
+  if (!company_id) return json({ error: 'Empresa não encontrada' }, 404)
 
-  // Monta título resumido
-  const title = description.trim().slice(0, 80)
-
-  // SLA: média = 24h
+  const title        = description.trim().slice(0, 80)
   const sla_deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
   const due_date     = sla_deadline.split('T')[0]
+  const photosJson   = photos?.length ? JSON.stringify(photos.slice(0, 3)) : null
 
-  // Fotos: salva base64 diretamente no banco (igual ao modal admin)
-  const photosJson = photos?.length ? JSON.stringify(photos.slice(0, 3)) : null
-
-  const { data: task, error } = await sb.from('tasks').insert({
+  const { data: task, error } = await restPost('tasks', {
     title,
     description:       description.trim(),
     requester:         name.trim(),
@@ -78,7 +86,7 @@ export default async function handler(req) {
     company_id,
     assignee:          'A definir',
     photos:            photosJson,
-  }).select('id').single()
+  })
 
   if (error) {
     console.error('[public/request]', error)

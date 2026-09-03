@@ -1,10 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
-
 export const config = { runtime: 'edge' }
 
-const SB_URL     = process.env.SUPABASE_URL
-const SB_ANON   = process.env.SUPABASE_ANON_KEY
-const SB_SERVICE = process.env.SUPABASE_SERVICE_KEY
+const SB_URL     = (process.env.SUPABASE_URL     || '').trim()
+const SB_ANON    = (process.env.SUPABASE_ANON_KEY || '').trim()
+const SB_SERVICE = (process.env.SUPABASE_SERVICE_KEY || '').trim()
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -18,69 +16,79 @@ function json(body, status = 200) {
   })
 }
 
+function svcHeaders() {
+  return { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' }
+}
+
 export default async function handler(req) {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
 
-  const token = (req.headers.get('Authorization') || '').replace('Bearer ', '')
+  const token = (req.headers.get('Authorization') || '').replace('Bearer ', '').trim()
   if (!token) return json({ error: 'Unauthorized' }, 401)
 
-  const sbAnon = createClient(SB_URL, SB_ANON, {
-    global: { headers: { Authorization: `Bearer ${token}` } }
+  // Valida o JWT do usuário logado
+  const authRes = await fetch(`${SB_URL}/auth/v1/user`, {
+    headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` }
   })
-  const { data: { user: adminUser } } = await sbAnon.auth.getUser()
-  if (!adminUser) return json({ error: 'Unauthorized' }, 401)
+  if (!authRes.ok) return json({ error: 'Unauthorized' }, 401)
+  const me = await authRes.json()
 
-  const company_id = adminUser.user_metadata?.company_id
+  const company_id = me.user_metadata?.company_id
   if (!company_id) return json({ error: 'No company' }, 400)
 
-  const sbService = createClient(SB_URL, SB_SERVICE)
-
+  // ── GET: lista usuários ───────────────────────────────────────────
   if (req.method === 'GET') {
-    // Lista todos os usuários do Supabase Auth e filtra pelo company_id
-    const { data, error } = await sbService.auth.admin.listUsers({ perPage: 200 })
-    if (error) return json({ error: error.message }, 500)
-
-    const users = (data?.users || [])
+    const r = await fetch(`${SB_URL}/auth/v1/admin/users?per_page=200`, { headers: svcHeaders() })
+    if (!r.ok) {
+      const txt = await r.text()
+      return json({ error: `admin/users ${r.status}: ${txt}` }, 500)
+    }
+    const data = await r.json()
+    const users = (data.users || [])
       .filter(u => u.user_metadata?.company_id === company_id)
       .map(u => ({
         id:         u.id,
-        name:       u.user_metadata?.name || '',
+        name:       u.user_metadata?.name     || '',
         username:   u.user_metadata?.username || '',
-        role:       u.user_metadata?.role || 'operator',
+        role:       u.user_metadata?.role     || 'operator',
         created_at: u.created_at,
         last_sign:  u.last_sign_in_at,
       }))
-
     return json({ users })
   }
 
+  // ── DELETE ────────────────────────────────────────────────────────
   if (req.method === 'DELETE') {
     const { user_id } = await req.json()
-    // Impede deletar a si mesmo
-    if (user_id === adminUser.id) return json({ error: 'Não pode deletar a si mesmo' }, 400)
+    if (user_id === me.id) return json({ error: 'Não pode deletar a si mesmo' }, 400)
 
-    // Verifica se o usuário pertence à mesma empresa
-    const { data: target } = await sbService.auth.admin.getUserById(user_id)
-    if (target?.user?.user_metadata?.company_id !== company_id) return json({ error: 'Forbidden' }, 403)
+    const tRes = await fetch(`${SB_URL}/auth/v1/admin/users/${user_id}`, { headers: svcHeaders() })
+    if (!tRes.ok) return json({ error: 'Usuário não encontrado' }, 404)
+    const target = await tRes.json()
+    if (target.user_metadata?.company_id !== company_id) return json({ error: 'Forbidden' }, 403)
 
-    const { error } = await sbService.auth.admin.deleteUser(user_id)
-    if (error) return json({ error: error.message }, 500)
+    const dRes = await fetch(`${SB_URL}/auth/v1/admin/users/${user_id}`, { method: 'DELETE', headers: svcHeaders() })
+    if (!dRes.ok) return json({ error: `Delete ${dRes.status}` }, 500)
     return json({ ok: true })
   }
 
+  // ── PATCH: reset senha ────────────────────────────────────────────
   if (req.method === 'PATCH') {
     const { user_id, password } = await req.json()
     if (!user_id || !password) return json({ error: 'user_id e password obrigatórios' }, 400)
     if (password.length < 6) return json({ error: 'Senha mínimo 6 caracteres' }, 400)
 
-    const { data: target } = await sbService.auth.admin.getUserById(user_id)
-    if (target?.user?.user_metadata?.company_id !== company_id) return json({ error: 'Forbidden' }, 403)
+    const tRes = await fetch(`${SB_URL}/auth/v1/admin/users/${user_id}`, { headers: svcHeaders() })
+    if (!tRes.ok) return json({ error: 'Usuário não encontrado' }, 404)
+    const target = await tRes.json()
+    if (target.user_metadata?.company_id !== company_id) return json({ error: 'Forbidden' }, 403)
 
-    const { error } = await sbService.auth.admin.updateUserById(user_id, {
-      password,
-      user_metadata: { ...target.user.user_metadata, must_change_password: true },
+    const uRes = await fetch(`${SB_URL}/auth/v1/admin/users/${user_id}`, {
+      method: 'PUT',
+      headers: svcHeaders(),
+      body: JSON.stringify({ password, user_metadata: { ...target.user_metadata, must_change_password: true } })
     })
-    if (error) return json({ error: error.message }, 500)
+    if (!uRes.ok) return json({ error: `Update ${uRes.status}` }, 500)
     return json({ ok: true })
   }
 

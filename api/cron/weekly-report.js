@@ -1,6 +1,6 @@
 export const config = { runtime: 'edge' }
 
-import { createClient } from '@supabase/supabase-js'
+import { makeDb } from '../v1/_auth.js'
 
 function buildHtml({ companyName, total, concluded, inProgress, overdue, lateRate, topProviders }) {
   const accent = '#3B82F6'
@@ -135,10 +135,7 @@ export default async function handler(req) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
   }
 
-  const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_KEY,
-  )
+  const supabase = makeDb()
 
   // Fetch active companies
   const { data: companies, error: compErr } = await supabase

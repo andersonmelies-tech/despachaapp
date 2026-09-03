@@ -1,5 +1,3 @@
-import { createClient } from '@supabase/supabase-js'
-
 export const config = { runtime: 'edge' }
 
 const SB_URL     = process.env.SUPABASE_URL
@@ -32,23 +30,25 @@ export default async function handler(req) {
   const token = (req.headers.get('Authorization') || '').replace('Bearer ', '')
   if (!token) return json({ error: 'Unauthorized' }, 401)
 
-  const sbAnon = createClient(SB_URL, SB_ANON, {
-    global: { headers: { Authorization: `Bearer ${token}` } }
+  const authRes = await fetch(`${SB_URL}/auth/v1/user`, {
+    headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` }
   })
-  const { data: { user: adminUser } } = await sbAnon.auth.getUser()
-  if (!adminUser) return json({ error: 'Unauthorized' }, 401)
+  if (!authRes.ok) return json({ error: 'Unauthorized' }, 401)
+  const adminUser = await authRes.json()
 
   // Só admin/manager podem criar usuários (ou o super admin pelo e-mail)
   const role = adminUser.user_metadata?.role
   const isSuperAdmin = adminUser.email === ADMIN_EMAIL
   if (!isSuperAdmin && !['admin', 'manager'].includes(role)) return json({ error: 'Forbidden' }, 403)
 
-  // Super admin: busca company_id via service key (não tem company_id no metadata)
+  // Super admin: busca company_id via REST (não tem company_id no metadata)
   let company_id = adminUser.user_metadata?.company_id
   if (!company_id && isSuperAdmin) {
-    const sbService0 = createClient(SB_URL, SB_SERVICE)
-    const { data: comp } = await sbService0.from('companies').select('id').limit(1).single()
-    company_id = comp?.id
+    const cmpRes = await fetch(`${SB_URL}/rest/v1/companies?select=id&limit=1`, {
+      headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` }
+    })
+    const cmpData = await cmpRes.json()
+    company_id = cmpData[0]?.id
   }
   if (!company_id) return json({ error: 'Company not found' }, 400)
 
@@ -59,22 +59,18 @@ export default async function handler(req) {
 
   const email = toEmail(username)
 
-  // Cria usuário com service key (sem confirmação de e-mail)
-  const sbService = createClient(SB_URL, SB_SERVICE)
-  const { data, error } = await sbService.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,   // confirma automaticamente, sem e-mail
-    user_metadata: {
-      name,
-      username,
-      role: newRole || 'operator',
-      company_id,
-      must_change_password: true,
-    }
+  const cRes = await fetch(`${SB_URL}/auth/v1/admin/users`, {
+    method: 'POST',
+    headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { name, username, role: newRole || 'operator', company_id, must_change_password: true }
+    })
   })
+  const cData = await cRes.json()
+  if (!cRes.ok) return json({ error: cData.msg || cData.message || 'Erro ao criar usuário' }, 400)
 
-  if (error) return json({ error: error.message }, 400)
-
-  return json({ ok: true, user_id: data.user?.id })
+  return json({ ok: true, user_id: cData.id })
 }

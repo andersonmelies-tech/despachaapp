@@ -6,7 +6,7 @@
  * Lógica: para cada regra ativa, gera tarefas nos próximos 60 dias
  * que ainda não existam. Atualiza last_generated ao final.
  */
-import { createClient } from '@supabase/supabase-js'
+import { makeDb } from '../v1/_auth.js'
 
 export const config = { runtime: 'edge' }
 
@@ -98,10 +98,7 @@ function getOccurrences(rec, from, to, skipWeekendsDefault = true) {
 export default async function handler(req) {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
 
-  const sb = createClient(
-    process.env.SUPABASE_URL        || '',
-    process.env.SUPABASE_SERVICE_KEY || ''
-  )
+  const sb = makeDb()
 
   // Para geração imediata após criação: { recurrence_id: N }
   let targetId = null

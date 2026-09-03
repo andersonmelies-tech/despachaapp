@@ -1,10 +1,7 @@
-/**
- * Retorna branding público da empresa pelo invite_code
- * Usado pelos formulários públicos para aplicar logo + cores da empresa
- */
-import { createClient } from '@supabase/supabase-js'
-
 export const config = { runtime: 'edge' }
+
+const SB_URL     = (process.env.SUPABASE_URL          || '').trim()
+const SB_SERVICE = (process.env.SUPABASE_SERVICE_KEY  || '').trim()
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -14,9 +11,17 @@ const CORS = {
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...CORS },
+    status, headers: { 'Content-Type': 'application/json', ...CORS }
   })
+}
+
+function svcHeaders() {
+  return { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` }
+}
+
+async function restGet(path) {
+  const r = await fetch(`${SB_URL}/rest/v1/${path}`, { headers: svcHeaders() })
+  return r.ok ? r.json() : null
 }
 
 export default async function handler(req) {
@@ -26,30 +31,31 @@ export default async function handler(req) {
   const url  = new URL(req.url)
   const code = url.searchParams.get('c') || ''
 
-  const sb = createClient(
-    process.env.SUPABASE_URL         || '',
-    process.env.SUPABASE_SERVICE_KEY || ''
-  )
-
   let company_id = null
   if (code) {
-    const { data: co } = await sb.from('companies').select('id,name')
-      .eq('invite_code', code).eq('active', true).maybeSingle()
-    company_id = co?.id
+    const rows = await restGet(`companies?select=id&invite_code=eq.${encodeURIComponent(code)}&limit=1`)
+    company_id = rows?.[0]?.id
   }
   if (!company_id) {
-    const { data: co } = await sb.from('companies').select('id,name').limit(1).maybeSingle()
-    company_id = co?.id
+    const rows = await restGet('companies?select=id&limit=1')
+    company_id = rows?.[0]?.id
   }
 
-  const { data: cfg } = await sb.from('config')
-    .select('key,value')
-    .in('key', ['brand_logo_url', 'brand_primary_color', 'brand_company_name'])
+  let cfg = []
+  if (company_id) {
+    cfg = await restGet(
+      `config?select=key,value&key=in.(brand_logo_url,brand_primary_color,brand_company_name)&company_id=eq.${encodeURIComponent(company_id)}`
+    ) || []
+  } else {
+    cfg = await restGet(
+      `config?select=key,value&key=in.(brand_logo_url,brand_primary_color,brand_company_name)`
+    ) || []
+  }
 
-  const brand = Object.fromEntries((cfg || []).map(r => [r.key, r.value]))
+  const brand = Object.fromEntries(cfg.map(r => [r.key, r.value]))
 
   return json({
-    logo_url:     brand.brand_logo_url     || null,
+    logo_url:      brand.brand_logo_url      || null,
     primary_color: brand.brand_primary_color || '#2563eb',
     company_name:  brand.brand_company_name  || null,
   })

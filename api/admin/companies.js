@@ -1,10 +1,9 @@
-import { createClient } from '@supabase/supabase-js'
-
 export const config = { runtime: 'edge' }
 
-const SB_URL     = process.env.SUPABASE_URL
-const SB_SERVICE = process.env.SUPABASE_SERVICE_KEY
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@despachaapp.app'
+const SB_URL      = (process.env.SUPABASE_URL          || '').trim()
+const SB_ANON     = (process.env.SUPABASE_ANON_KEY     || '').trim()
+const SB_SERVICE  = (process.env.SUPABASE_SERVICE_KEY  || '').trim()
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'admin@despachaapp.app').trim()
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -18,52 +17,51 @@ function json(body, status = 200) {
   })
 }
 
-async function getUser(token) {
-  const sb = createClient(SB_URL, process.env.SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: `Bearer ${token}` } }
+function svcHeaders() {
+  return { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' }
+}
+
+async function restGet(path) {
+  const r = await fetch(`${SB_URL}/rest/v1/${path}`, { headers: svcHeaders() })
+  return r.ok ? r.json() : null
+}
+
+async function restPatch(path, data) {
+  await fetch(`${SB_URL}/rest/v1/${path}`, {
+    method: 'PATCH', headers: svcHeaders(), body: JSON.stringify(data)
   })
-  const { data: { user } } = await sb.auth.getUser()
-  return user
 }
 
 export default async function handler(req) {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
 
-  const token = (req.headers.get('Authorization') || '').replace('Bearer ', '')
+  const token = (req.headers.get('Authorization') || '').replace('Bearer ', '').trim()
   if (!token) return json({ error: 'Unauthorized' }, 401)
 
-  const user = await getUser(token)
-  if (!user) return json({ error: 'Unauthorized' }, 401)
+  const authRes = await fetch(`${SB_URL}/auth/v1/user`, {
+    headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` }
+  })
+  if (!authRes.ok) return json({ error: 'Unauthorized' }, 401)
+  const user = await authRes.json()
 
-  // Verifica acesso admin
   const isAdmin = user.email === ADMIN_EMAIL || user.user_metadata?.is_superadmin === true
   if (!isAdmin) return json({ error: 'Forbidden' }, 403)
 
-  const sb = createClient(SB_URL, SB_SERVICE)
-
   if (req.method === 'GET') {
-    // Lista todas as empresas com stats
-    const { data: companies, error } = await sb
-      .from('companies')
-      .select('*')
-      .order('created_at', { ascending: false })
+    const companies = await restGet('companies?select=*&order=created_at.desc') || []
 
-    if (error) return json({ error: error.message }, 500)
-
-    // Conta usuários e tarefas por empresa
-    const enriched = await Promise.all((companies || []).map(async (c) => {
-      const [usersRes, tasksRes] = await Promise.all([
-        sb.from('users').select('id', { count: 'exact', head: true }).eq('company_id', c.id),
-        sb.from('tasks').select('id', { count: 'exact', head: true }).eq('company_id', c.id),
+    const enriched = await Promise.all(companies.map(async (c) => {
+      const [tasksData] = await Promise.all([
+        restGet(`tasks?select=id&company_id=eq.${c.id}&limit=1&head=true`),
       ])
-      return {
-        ...c,
-        users_count: usersRes.count || 0,
-        tasks_count: tasksRes.count || 0,
-      }
+      // Conta usuários via auth admin API
+      const uRes = await fetch(`${SB_URL}/auth/v1/admin/users?per_page=200`, { headers: svcHeaders() })
+      const uData = uRes.ok ? await uRes.json() : { users: [] }
+      const users_count = (uData.users || []).filter(u => u.user_metadata?.company_id === c.id).length
+
+      return { ...c, users_count, tasks_count: 0 }
     }))
 
-    // MRR
     const PLAN_PRICES = { starter: 97, pro: 197, enterprise: 497 }
     const mrr = enriched
       .filter(c => c.subscription_status === 'active')
@@ -79,28 +77,28 @@ export default async function handler(req) {
     if (action === 'extend_trial') {
       const newDate = new Date()
       newDate.setDate(newDate.getDate() + (days || 7))
-      await sb.from('companies').update({
+      await restPatch(`companies?id=eq.${company_id}`, {
         trial_ends_at: newDate.toISOString(),
         subscription_status: 'trialing',
         plan: 'trial',
-      }).eq('id', company_id)
+      })
       return json({ ok: true })
     }
 
     if (action === 'cancel') {
-      await sb.from('companies').update({
+      await restPatch(`companies?id=eq.${company_id}`, {
         subscription_status: 'cancelled',
         plan: 'trial',
         stripe_subscription_id: null,
-      }).eq('id', company_id)
+      })
       return json({ ok: true })
     }
 
     if (action === 'activate') {
-      await sb.from('companies').update({
+      await restPatch(`companies?id=eq.${company_id}`, {
         subscription_status: 'active',
         plan: body.plan || 'pro',
-      }).eq('id', company_id)
+      })
       return json({ ok: true })
     }
 

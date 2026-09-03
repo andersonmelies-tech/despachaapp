@@ -1,10 +1,7 @@
-/**
- * DespachaApp — Lista setores da empresa pelo invite_code
- * Usado pelo formulário público /solicitar sem autenticação
- */
-import { createClient } from '@supabase/supabase-js'
-
 export const config = { runtime: 'edge' }
+
+const SB_URL     = (process.env.SUPABASE_URL          || '').trim()
+const SB_SERVICE = (process.env.SUPABASE_SERVICE_KEY  || '').trim()
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -14,9 +11,17 @@ const CORS = {
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...CORS },
+    status, headers: { 'Content-Type': 'application/json', ...CORS }
   })
+}
+
+function svcHeaders() {
+  return { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` }
+}
+
+async function restGet(path) {
+  const r = await fetch(`${SB_URL}/rest/v1/${path}`, { headers: svcHeaders() })
+  return r.ok ? r.json() : null
 }
 
 export default async function handler(req) {
@@ -26,32 +31,18 @@ export default async function handler(req) {
   const url         = new URL(req.url)
   const invite_code = url.searchParams.get('c') || ''
 
-  const sb = createClient(
-    process.env.SUPABASE_URL         || '',
-    process.env.SUPABASE_SERVICE_KEY || ''
-  )
-
-  // Resolve company_id pelo invite_code
   let company_id = null
   if (invite_code) {
-    const { data: co } = await sb.from('companies').select('id')
-      .eq('invite_code', invite_code).eq('active', true).maybeSingle()
-    company_id = co?.id
+    const rows = await restGet(`companies?select=id&invite_code=eq.${encodeURIComponent(invite_code)}&limit=1`)
+    company_id = rows?.[0]?.id
   }
   if (!company_id) {
-    const { data: co } = await sb.from('companies').select('id').limit(1).maybeSingle()
-    company_id = co?.id
+    const rows = await restGet('companies?select=id&limit=1')
+    company_id = rows?.[0]?.id
   }
 
   if (!company_id) return json({ sectors: [] })
 
-  const { data, error } = await sb
-    .from('sectors')
-    .select('id, name')
-    .eq('company_id', company_id)
-    .order('name')
-
-  if (error) return json({ sectors: [] })
-
-  return json({ sectors: data || [] })
+  const rows = await restGet(`sectors?select=id,name&company_id=eq.${encodeURIComponent(company_id)}&order=name.asc`)
+  return json({ sectors: rows || [] })
 }
