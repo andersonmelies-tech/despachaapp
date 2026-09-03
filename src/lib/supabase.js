@@ -1,7 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 
-const url = import.meta.env.VITE_SUPABASE_URL
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY
+// Strip any character outside printable ASCII (U+0020–U+007E) — safe for JWTs and URLs.
+// This handles BOM (U+FEFF), zero-width chars, and any encoding artifact from env vars.
+function cleanEnv(s) {
+  return (s || '').replace(/[^ -~]/g, '').trim()
+}
+const url = cleanEnv(import.meta.env.VITE_SUPABASE_URL)
+const key = cleanEnv(import.meta.env.VITE_SUPABASE_ANON_KEY)
 
 export const supabase = createClient(url, key)
 
