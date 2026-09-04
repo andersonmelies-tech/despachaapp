@@ -117,13 +117,17 @@ function nowPtBR() {
   }).replace(', ', ' ')
 }
 
+function provName(t) {
+  return t.assignee?.trim() || 'A definir'
+}
+
 function fmtShort(t) {
   const urg  = URG[t.urgency] || ''
   const sta  = STA[t.status]  || ''
   const sla  = fmtDate(t.sla_deadline)
   const pobs = t.provider_obs      ? '📌 ' : ''
   const pdat = t.provider_new_date ? '📅 ' : ''
-  return `${urg} *#${t.id}* — ${t.title}\n   👤 ${t.assignee}  |  ⏱ Conclusão: *${sla}*\n   ${sta} ${pobs}${pdat}`
+  return `${urg} *#${t.id}* — ${t.title}\n   👤 ${provName(t)}  |  ⏱ Conclusão: *${sla}*\n   ${sta} ${pobs}${pdat}`
 }
 
 function fmtDetail(t) {
@@ -131,7 +135,7 @@ function fmtDetail(t) {
     `${URG[t.urgency] || ''} *Tarefa #${t.id}*\n━━━━━━━━━━━━━━━━━━\n` +
     `📋 *${t.title}*\n\n` +
     `📝 ${t.description || '–'}\n\n` +
-    `👤 *Prestador:* ${t.assignee}\n` +
+    `👤 *Prestador:* ${provName(t)}\n` +
     `🏢 *Setor:* ${t.sector || '–'}\n` +
     `🏷 *Categoria:* ${t.category || '–'}\n\n` +
     `⏱ *Conclusão prevista (SLA):* *${fmtDate(t.sla_deadline)}*\n` +
@@ -196,7 +200,7 @@ function backMenuKb() {
 
 // ── Tasks query ───────────────────────────────────────────────────────────────
 async function getTasks({ provId, companyId, status, urgency, overdue, search } = {}) {
-  let q = sb.from('tasks').select('id,title,description,status,urgency,sector,assignee_id,created_at,due_date,completed_at,sla_deadline,elapsed_minutes,requester,location,notes,company_id')
+  let q = sb.from('tasks').select('id,title,description,status,urgency,sector,assignee,assignee_id,created_at,due_date,completed_at,started_at,sla_deadline,elapsed_minutes,requester,location,notes,provider_obs,provider_new_date,company_id')
   if (companyId) q = q.eq('company_id', companyId)
   if (provId)    q = q.eq('assignee_id', provId)
   if (Array.isArray(status)) q = q.in('status', status)
@@ -211,8 +215,22 @@ async function getTasks({ provId, companyId, status, urgency, overdue, search } 
     q = q.or(`title.ilike.%${search}%,description.ilike.%${search}%,requester.ilike.%${search}%`)
   }
   const { data } = await q
+  const tasks = data || []
+
+  // Resolve nome do prestador via assignee_id para tarefas com assignee vazio (migração)
+  const missingIds = [...new Set(tasks.filter(t => !t.assignee?.trim() && t.assignee_id).map(t => t.assignee_id))]
+  if (missingIds.length) {
+    const { data: provs } = await sb.from('providers').select('id,name').in('id', missingIds)
+    const nameMap = Object.fromEntries((provs || []).map(p => [p.id, p.name]))
+    for (const t of tasks) {
+      if (!t.assignee?.trim() && t.assignee_id && nameMap[t.assignee_id]) {
+        t.assignee = nameMap[t.assignee_id]
+      }
+    }
+  }
+
   const ord = { critica: 0, alta: 1, media: 2, baixa: 3 }
-  return (data || []).sort((a, b) =>
+  return tasks.sort((a, b) =>
     (ord[a.urgency] ?? 4) - (ord[b.urgency] ?? 4) || b.id - a.id
   )
 }
@@ -460,6 +478,10 @@ async function handleCallback(chatId, msgId, queryId, data) {
     const tid = parseInt(data.split(':')[1])
     const { data: task } = await sb.from('tasks').select('*').eq('id', tid).maybeSingle()
     if (!task) return edit(chatId, msgId, '❌ Tarefa não encontrada.')
+    if (!task.assignee?.trim() && task.assignee_id) {
+      const { data: p } = await sb.from('providers').select('name').eq('id', task.assignee_id).maybeSingle()
+      if (p?.name) task.assignee = p.name
+    }
     return edit(chatId, msgId, fmtDetail(task), taskKb(task))
   }
 
