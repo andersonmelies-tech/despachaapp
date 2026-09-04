@@ -129,10 +129,33 @@ export default async function handler(req) {
   }
 
   // Flip: tarefas "cadastrada" com due_date <= hoje viram "pendente"
+  // Busca IDs antes do flip para poder notificar André via Telegram depois
+  const { data: toFlip } = await sb.from('tasks')
+    .select('id')
+    .eq('status', 'cadastrada')
+    .eq('provider_notified', false)
+    .lte('due_date', today)
+
   await sb.from('tasks')
     .update({ status: 'pendente' })
     .eq('status', 'cadastrada')
     .lte('due_date', today)
+
+  // Notifica o prestador para cada tarefa ativada hoje
+  if (toFlip?.length) {
+    const SELF = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : 'https://despachaapp.vercel.app'
+    await Promise.allSettled(
+      toFlip.map(t =>
+        fetch(`${SELF}/api/telegram/notify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ task_id: t.id }),
+        })
+      )
+    )
+  }
 
   let totalGenerated = 0
   const results = []
