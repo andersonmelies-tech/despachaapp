@@ -3,9 +3,9 @@ import { supabase, calcSlaDeadline, isoToLocalDate, isOverdue, uploadTaskPhoto }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 export const URG_LABEL = { critica: '🚨 Crítica', alta: '🔴 Alta', media: '🟡 Média', baixa: '🟢 Baixa' }
-export const STA_LABEL = { cadastrada: '📋 Cadastrada', pendente: '⏳ Pendente', em_andamento: '🔧 Em andamento', prestador_externo: '🏢 Prestador Externo', concluida: '✅ Concluída', cancelada: '❌ Cancelada' }
+export const STA_LABEL = { cadastrada: '📋 Cadastrada', pendente: '⏳ Pendente', em_andamento: '🔧 Em andamento', pausada: '⏸ Pausada', prestador_externo: '🏢 Prestador Externo', concluida: '✅ Concluída', cancelada: '❌ Cancelada' }
 export const URGENCIES = ['critica', 'alta', 'media', 'baixa']
-export const STATUSES  = ['cadastrada', 'pendente', 'em_andamento', 'prestador_externo', 'concluida', 'cancelada']
+export const STATUSES  = ['cadastrada', 'pendente', 'em_andamento', 'pausada', 'prestador_externo', 'concluida', 'cancelada']
 
 export function fmtMin(m) {
   if (!m) return '–'
@@ -569,6 +569,20 @@ export default function TaskDetail({ task: initialTask, onClose, onUpdate, showT
     showToast(STA_LABEL[newStatus] + ' ✓')
   }
 
+  async function pauseTask() {
+    const motivo = (window.prompt('Motivo da pausa:') || '').trim()
+    if (!motivo) return
+    const carimbo = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    const linha = `⏸ [${carimbo}] Gestor: PAUSA — ${motivo}`
+    const obs = task.provider_obs ? `${task.provider_obs}\n${linha}` : linha
+    const { data, error } = await supabase.from('tasks').update({ status: 'pausada', provider_obs: obs }).eq('id', task.id).select().single()
+    if (error) { showToast('Erro ao pausar', 'err'); return }
+    await supabase.from('task_history').insert({ task_id: task.id, action: 'pausa', old_value: task.status, new_value: motivo, changed_by: 'web' })
+    setTask(data)
+    onUpdate()
+    showToast('⏸ Pausada ✓')
+  }
+
   if (editing) {
     return (
       <TaskModal
@@ -687,6 +701,8 @@ export default function TaskDetail({ task: initialTask, onClose, onUpdate, showT
         <div className="mfoot">
           {task.status === 'pendente' && <button className="btn-primary" style={{ background: 'var(--blue)', color: '#fff' }} onClick={() => changeStatus('em_andamento')}>▶ INICIAR</button>}
           {task.status === 'em_andamento' && <button className="btn-primary" style={{ background: 'var(--green)', color: '#000' }} onClick={() => changeStatus('concluida')}>✅ CONCLUIR</button>}
+          {task.status === 'em_andamento' && <button className="btn-sec" style={{ background: '#ca8a0422', color: '#ca8a04', border: '1px solid #ca8a0455' }} onClick={pauseTask}>⏸ Pausar</button>}
+          {task.status === 'pausada' && <button className="btn-primary" style={{ background: 'var(--blue)', color: '#fff' }} onClick={() => changeStatus('em_andamento')}>▶ Reiniciar</button>}
           {!['concluida', 'cancelada'].includes(task.status) && <button className="btn-danger" onClick={() => changeStatus('cancelada')}>✕ Cancelar</button>}
           <button className="btn-sec" onClick={() => setEditing(true)}>✏ Editar</button>
           <button className="btn-sec" onClick={onClose}>Fechar</button>

@@ -58,7 +58,7 @@ export default async function handler(req) {
       .from('tasks')
       .select('id, title, urgency, created_at, assignee_id, status')
       .eq('company_id', company.id)
-      .not('status', 'in', '("concluida","cancelada")')
+      .not('status', 'in', '("concluida","cancelada","pausada")')
 
     if (!tasks || tasks.length === 0) continue
     totalChecked += tasks.length

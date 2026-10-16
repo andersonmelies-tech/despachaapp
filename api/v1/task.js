@@ -3,7 +3,7 @@ import { authenticate, ok, err, CORS_HEADERS } from './_auth.js'
 export const config = { runtime: 'edge' }
 
 const ALLOWED_PATCH_FIELDS = ['title', 'description', 'requester', 'requester_phone', 'requester_sector', 'sector', 'category', 'status', 'urgency', 'assignee_id', 'due_date', 'notes', 'client_name', 'client_address', 'task_type', 'client_id', 'needs_approval']
-const VALID_STATUSES = ['pendente', 'em_andamento', 'concluida', 'cancelada']
+const VALID_STATUSES = ['pendente', 'em_andamento', 'pausada', 'concluida', 'cancelada']
 
 export default async function handler(request) {
   if (request.method === 'OPTIONS') {

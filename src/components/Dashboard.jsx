@@ -58,7 +58,7 @@ export default function Dashboard({ showToast, onStatsLoaded }) {
       .from('tasks')
       .select('id, title, assignee, due_date, provider_new_date')
       .not('provider_new_date', 'is', null)
-      .not('status', 'in', '("concluida","cancelada")')
+      .not('status', 'in', '("concluida","cancelada","pausada")')
       .order('id', { ascending: false })
     if (!mountedRef.current) return
     _dc.dates = data || []

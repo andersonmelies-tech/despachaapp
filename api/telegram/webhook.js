@@ -12,9 +12,28 @@ import { makeDb } from '../v1/_auth.js'
 
 export const config = { runtime: 'edge' }
 
-const TOKEN = process.env.TELEGRAM_TOKEN || ''
-const TG    = `https://api.telegram.org/bot${TOKEN}`
-const sb    = makeDb()
+const TOKEN      = process.env.TELEGRAM_TOKEN || ''
+const TG         = `https://api.telegram.org/bot${TOKEN}`
+const SB_URL     = (process.env.SUPABASE_URL         || '').trim()
+const SB_SERVICE = (process.env.SUPABASE_SERVICE_KEY || '').trim()
+const sb         = makeDb()
+
+// Faz upload de bytes para Supabase Storage e retorna a URL pública.
+// Substitui o armazenamento de base64 no banco (evita estourar o 500 MB free).
+async function uploadPhoto(bytes, storagePath) {
+  const res = await fetch(`${SB_URL}/storage/v1/object/task-photos/${storagePath}`, {
+    method: 'PUT',
+    headers: {
+      apikey: SB_SERVICE,
+      Authorization: `Bearer ${SB_SERVICE}`,
+      'Content-Type': 'image/jpeg',
+      'x-upsert': 'true',
+    },
+    body: bytes,
+  })
+  if (!res.ok) return null
+  return `${SB_URL}/storage/v1/object/public/task-photos/${storagePath}`
+}
 
 // ── Telegram API ──────────────────────────────────────────────────────────────
 async function tg(method, params) {
@@ -86,7 +105,7 @@ async function getProv(chatId) {
 const URG = { critica: '🚨 CRÍTICA', alta: '🔴 Alta', media: '🟡 Média', baixa: '🟢 Baixa' }
 const STA = {
   cadastrada: '📋 Cadastrada', pendente: '⏳ Pendente', em_andamento: '🔧 Em andamento',
-  prestador_externo: '🏢 Prestador Externo Acionado',
+  prestador_externo: '🏢 Prestador Externo Acionado', pausada: '⏸ Pausada',
   concluida: '✅ Concluída', cancelada: '❌ Cancelada',
 }
 
@@ -412,7 +431,7 @@ async function handleCallback(chatId, msgId, queryId, data) {
     const prov = await getProv(chatId)
     if (!prov) return edit(chatId, msgId, '❌ Prestador não vinculado.')
     const tasks = (await getTasks({ provId: prov.id, companyId: prov.company_id, urgency: 'critica' }))
-      .filter(t => !['concluida', 'cancelada'].includes(t.status))
+      .filter(t => !['concluida', 'cancelada', 'pausada'].includes(t.status))
     return showList(chatId, msgId, tasks, '🚨 Tarefas Críticas')
   }
 
@@ -447,7 +466,7 @@ async function handleCallback(chatId, msgId, queryId, data) {
       total:      mineTasks.length,
       concluidas: mineTasks.filter(t => t.status === 'concluida').length,
       andamento:  mineTasks.filter(t => t.status === 'em_andamento').length,
-      atrasadas:  mineTasks.filter(t => t.due_date && t.due_date < today && !['concluida','cancelada'].includes(t.status)).length,
+      atrasadas:  mineTasks.filter(t => t.due_date && t.due_date < today && !['concluida','cancelada','pausada'].includes(t.status)).length,
       avg_min:    finMine.length ? Math.round(finMine.reduce((a, t) => a + t.elapsed_minutes, 0) / finMine.length) : null,
     }
     const geral = {
@@ -687,18 +706,15 @@ async function handlePhoto(chatId, photos, caption) {
 
     const imgRes = await fetch(`https://api.telegram.org/file/bot${TOKEN}/${filePath}`)
     const imgBuf = await imgRes.arrayBuffer()
-    const bytes  = new Uint8Array(imgBuf)
 
-    // Base64 em chunks para não estourar a stack
-    let binary = ''
-    for (let i = 0; i < bytes.length; i += 8192) {
-      binary += String.fromCharCode(...bytes.subarray(i, i + 8192))
-    }
-    const dataUrl = `data:image/jpeg;base64,${btoa(binary)}`
+    // Upload direto para Supabase Storage — não salva base64 no banco
+    const storagePath = `${tid}/${Date.now()}.jpg`
+    const url = await uploadPhoto(new Uint8Array(imgBuf), storagePath)
+    if (!url) throw new Error('Falha ao fazer upload da foto para o Storage')
 
     let existing = []
     try { if (task.photos) existing = JSON.parse(task.photos) } catch {}
-    existing.push(dataUrl)
+    existing.push(url)
 
     const updates = { photos: JSON.stringify(existing) }
 

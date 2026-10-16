@@ -172,7 +172,7 @@ export default function Tasks({ showToast, sideFilter, user, plan, onStatsChange
         t.assignee.toLowerCase().includes(q)
       )
     }
-    const statusOrd = { em_andamento: 0, prestador_externo: 0, pendente: 1, cadastrada: 2, cancelada: 3, concluida: 4 }
+    const statusOrd = { em_andamento: 0, prestador_externo: 0, pausada: 0, pendente: 1, cadastrada: 2, cancelada: 3, concluida: 4 }
     const urgOrd    = { critica: 0, alta: 1, media: 2, baixa: 3 }
     return list.sort((a, b) =>
       (statusOrd[a.status] ?? 4) - (statusOrd[b.status] ?? 4) ||
@@ -195,7 +195,7 @@ export default function Tasks({ showToast, sideFilter, user, plan, onStatsChange
   const fmtSP = d => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(d))
   const tarefasHoje = tasks.filter(t => {
     if (['cancelada', 'cadastrada'].includes(t.status)) return false
-    if (['em_andamento', 'prestador_externo'].includes(t.status)) return true  // em andamento / externo = sempre do dia
+    if (['em_andamento', 'prestador_externo', 'pausada'].includes(t.status)) return true  // em andamento / externo / pausada = sempre do dia
     const dueHoje = t.due_date?.slice(0, 10) === todayKey
     const slaHoje = t.sla_deadline ? fmtSP(t.sla_deadline) === todayKey : false
     return dueHoje || slaHoje

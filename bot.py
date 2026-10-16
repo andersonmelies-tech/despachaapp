@@ -78,7 +78,7 @@ def _get_tasks_sync(prov_id=None, company_id=None, status=None, urgency=None, ov
         if urgency:  q = q.eq("urgency", urgency)
         if overdue:
             now = datetime.now().isoformat()
-            q = q.lt("sla_deadline", now).not_.in_("status", ["concluida", "cancelada"])
+            q = q.lt("sla_deadline", now).not_.in_("status", ["concluida", "cancelada", "pausada"])
         if search:
             q = q.or_(f"title.ilike.%{search}%,description.ilike.%{search}%,requester.ilike.%{search}%")
         tasks = q.execute().data or []
@@ -101,7 +101,7 @@ def _get_stats_sync(prov_id, company_id=None):
             "total":      len(all_tasks),
             "concluidas": sum(1 for t in all_tasks if t["status"] == "concluida"),
             "andamento":  sum(1 for t in all_tasks if t["status"] == "em_andamento"),
-            "atrasadas":  sum(1 for t in all_tasks if t.get("due_date","") < today and t["status"] not in ("concluida","cancelada")),
+            "atrasadas":  sum(1 for t in all_tasks if t.get("due_date","") < today and t["status"] not in ("concluida","cancelada","pausada")),
         }
         fin  = [t for t in all_tasks    if t.get("elapsed_minutes")]
         gfin = [t for t in global_tasks if t.get("elapsed_minutes")]
@@ -192,6 +192,7 @@ def compress_photo(img_bytes, max_px=800, quality=62):
 # ── Labels / formatação ───────────────────────────────────────────────────────
 URG = {"critica": "🚨 CRÍTICA", "alta": "🔴 Alta", "media": "🟡 Média", "baixa": "🟢 Baixa"}
 STA = {"pendente": "⏳ Pendente", "em_andamento": "🔧 Em andamento",
+       "pausada": "⏸ Pausada",
        "concluida": "✅ Concluída", "cancelada": "❌ Cancelada"}
 
 def elapsed_str(m):
@@ -258,6 +259,9 @@ def task_kb(t):
         rows.append([InlineKeyboardButton("▶️ INICIAR AGORA", callback_data=f"start:{tid}")])
     if st == "em_andamento":
         rows.append([InlineKeyboardButton("✅ FINALIZAR TAREFA", callback_data=f"done:{tid}")])
+        rows.append([InlineKeyboardButton("⏸ Pausar", callback_data=f"pause:{tid}")])
+    if st == "pausada":
+        rows.append([InlineKeyboardButton("▶️ REINICIAR TAREFA", callback_data=f"resume:{tid}")])
     if st not in ("cancelada","concluida"):
         rows.append([
             InlineKeyboardButton("💬 Observação",       callback_data=f"obs:{tid}"),
@@ -414,7 +418,7 @@ async def button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if not prov: await q.edit_message_text("❌ Prestador não vinculado. Use /start."); return
         company_id = prov.get("company_id")
         # Uma única query com filtro OR de status
-        tasks = await aget_tasks(prov_id=prov["id"], company_id=company_id, status=["pendente", "em_andamento"])
+        tasks = await aget_tasks(prov_id=prov["id"], company_id=company_id, status=["pendente", "em_andamento", "pausada"])
         await show_list(q, tasks, "📋 Suas Tarefas Abertas"); return
 
     if data == "in_progress":
@@ -488,6 +492,7 @@ async def button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("✅ FINALIZAR AGORA",  callback_data=f"done:{tid}")],
+                    [InlineKeyboardButton("⏸ Pausar",           callback_data=f"pause:{tid}")],
                     [InlineKeyboardButton("💬 Observação",       callback_data=f"obs:{tid}"),
                      InlineKeyboardButton("📅 Nova Data",        callback_data=f"newdate:{tid}")],
                     [InlineKeyboardButton("🔙 Minhas Tarefas",  callback_data="my_tasks")]])); return
@@ -521,6 +526,29 @@ async def button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             f"Digite sua observação. Ela ficará visível para o gestor no sistema web:",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancelar", callback_data=f"view:{tid}")]])); return
+
+    if data.startswith("pause:"):
+        tid = int(data.split(":")[1])
+        set_wait(chat_id, "pause", task_id=tid)
+        await q.edit_message_text(
+            f"⏸ *Pausar — Tarefa #{tid}*\n\n"
+            f"Digite o *motivo* da pausa. Enquanto pausada, a tarefa não conta como atrasada.",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancelar", callback_data=f"view:{tid}")]])); return
+
+    if data.startswith("resume:"):
+        tid  = int(data.split(":")[1])
+        task = await aupdate_task(tid, chat_id, status="em_andamento")
+        if task:
+            await q.edit_message_text(
+                f"▶️ *Tarefa #{tid} REINICIADA!*\n\n"
+                f"📋 {task['title']}\n"
+                f"_O tempo de execução segue contando._",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✅ FINALIZAR AGORA",  callback_data=f"done:{tid}")],
+                    [InlineKeyboardButton("⏸ Pausar",           callback_data=f"pause:{tid}")],
+                    [InlineKeyboardButton("🔙 Minhas Tarefas",  callback_data="my_tasks")]])); return
 
     if data.startswith("photo:"):
         tid = int(data.split(":")[1])
@@ -619,6 +647,32 @@ async def text_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton("👁 Ver tarefa", callback_data=f"view:{tid}"),
                 InlineKeyboardButton("🏠 Menu",        callback_data="menu")]])); return
 
+    if mode == "pause":
+        clear_wait(chat_id)
+        tid  = wait.get("task_id")
+        task = await aone("tasks", id=tid) if tid else None
+        if not task: await update.message.reply_text("❌ Tarefa não encontrada."); return
+        prov = await get_prov(chat_id)
+        name = prov["name"] if prov else "Prestador"
+        motivo   = update.message.text.strip()
+        now_str  = datetime.now().strftime("%d/%m %H:%M")
+        nova_obs = f"⏸ [{now_str}] {name}: PAUSA — {motivo}"
+        obs_ant  = task.get("provider_obs","") or ""
+        obs_final = f"{obs_ant}\n{nova_obs}".strip() if obs_ant else nova_obs
+        await aupdate_task(tid, chat_id, status="pausada")
+        await asyncio.gather(
+            aupd("tasks", {"provider_obs": obs_final}, id=tid),
+            ains("task_history", {"task_id": tid, "action": "pausa",
+                "old_value": "", "new_value": motivo, "changed_by": f"tg:{name}"})
+        )
+        await update.message.reply_text(
+            f"⏸ *Tarefa #{tid} pausada!*\n\nMotivo: _{motivo}_\n\n"
+            f"_Não conta como atrasada enquanto pausada._",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("▶️ Reiniciar", callback_data=f"resume:{tid}"),
+                InlineKeyboardButton("🏠 Menu",       callback_data="menu")]])); return
+
     if mode == "newdate":
         clear_wait(chat_id)
         tid  = wait.get("task_id")
@@ -715,7 +769,7 @@ async def cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 def _fetch_unnotified():
     if not sb: return []
     try:
-        return sb.table("tasks").select("*").eq("provider_notified", False).not_.in_("status", ["cancelada"]).execute().data or []
+        return sb.table("tasks").select("id, title, description, requester, sector, urgency, sla_deadline, assignee_id, company_id").eq("provider_notified", False).not_.in_("status", ["cancelada"]).execute().data or []
     except: return []
 
 async def notify_new_tasks(ctx: ContextTypes.DEFAULT_TYPE):

@@ -52,7 +52,7 @@ export function isoToLocalDate(iso) {
 }
 
 export function isOverdue(task) {
-  if (['concluida', 'cancelada', 'pendente', 'cadastrada'].includes(task.status)) return false
+  if (['concluida', 'cancelada', 'pendente', 'cadastrada', 'pausada'].includes(task.status)) return false
   const now = new Date()
   // T23:59:59 evita que o parse UTC desloque a data -3h (Brazil), tornando
   // tarefas com due_date=hoje já atrasadas desde às 21h de ontem

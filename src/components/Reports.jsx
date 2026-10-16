@@ -976,8 +976,8 @@ function buildMonthOpts() {
 const MONTH_OPTS = buildMonthOpts()
 const THIS_MONTH = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2,'0')}`
 
-const STA_OPTIONS = ['cadastrada','pendente','em_andamento','prestador_externo','concluida','cancelada']
-const STA_LABELS  = { cadastrada:'Cadastrada', pendente:'Pendente', em_andamento:'Em andamento', prestador_externo:'Prestador Externo', concluida:'Concluída', cancelada:'Cancelada' }
+const STA_OPTIONS = ['cadastrada','pendente','em_andamento','pausada','prestador_externo','concluida','cancelada']
+const STA_LABELS  = { cadastrada:'Cadastrada', pendente:'Pendente', em_andamento:'Em andamento', pausada:'Pausada', prestador_externo:'Prestador Externo', concluida:'Concluída', cancelada:'Cancelada' }
 const URG_OPTIONS = ['critica','alta','media','baixa']
 const URG_LABELS  = { critica:'Crítica', alta:'Alta', media:'Média', baixa:'Baixa' }
 

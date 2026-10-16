@@ -210,6 +210,7 @@ select:focus { border-color: var(--blue); }
 .stbadge.em_andamento { background: #3296EE18; color: var(--blue);   border: 1px solid #3296EE44; }
 .stbadge.concluida    { background: #00d48a18; color: var(--green);  border: 1px solid #00d48a44; }
 .stbadge.cancelada    { background: #7B818F18; color: var(--muted);  border: 1px solid #7B818F44; }
+.stbadge.pausada      { background: #ca8a0418; color: #ca8a04;       border: 1px solid #ca8a0444; }
 
 .role-badge { display: inline-flex; align-items: center; font-size: .65rem; font-weight: 700; padding: .14rem .45rem; border-radius: 20px; letter-spacing: .02em; }
 .role-badge.admin    { background: #FFD70022; color: var(--yellow); border: 1px solid #FFD70044; }
