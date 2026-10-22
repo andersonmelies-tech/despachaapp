@@ -196,6 +196,10 @@ function taskKb(t) {
     ])
   if (st === 'prestador_externo')
     rows.push([{ text: '✅ FINALIZAR TAREFA', callback_data: `done:${tid}` }])
+  if (['em_andamento', 'prestador_externo'].includes(st))
+    rows.push([{ text: '⏸ Pausar', callback_data: `pause:${tid}` }])
+  if (st === 'pausada')
+    rows.push([{ text: '▶️ REINICIAR TAREFA', callback_data: `resume:${tid}` }])
   if (!['cancelada', 'concluida'].includes(st)) {
     rows.push([
       { text: '💬 Observação',       callback_data: `obs:${tid}` },
@@ -305,7 +309,7 @@ async function showList(chatId, msgId, tasks, title) {
   for (const t of tasks.slice(0, 8)) {
     msg += fmtShort(t) + '\n\n'
     const urgIcon = (URG[t.urgency] || '').slice(0, 2)
-    const stIcon  = t.status === 'em_andamento' ? '🔧' : t.status === 'prestador_externo' ? '🏢' : '⏳'
+    const stIcon  = t.status === 'em_andamento' ? '🔧' : t.status === 'prestador_externo' ? '🏢' : t.status === 'pausada' ? '⏸' : '⏳'
     btns.push([{ text: `${urgIcon}${stIcon} #${t.id} — ${t.title.slice(0, 28)}`, callback_data: `view:${t.id}` }])
   }
   btns.push([{ text: '🔙 Menu', callback_data: 'menu' }])
@@ -409,9 +413,9 @@ async function handleCallback(chatId, msgId, queryId, data) {
       dateWindow.push(spFmt(mon))
     }
 
-    const all   = await getTasks({ provId: prov.id, companyId: prov.company_id, status: ['pendente', 'em_andamento', 'prestador_externo'] })
+    const all   = await getTasks({ provId: prov.id, companyId: prov.company_id, status: ['pendente', 'em_andamento', 'prestador_externo', 'pausada'] })
     const tasks = all.filter(t =>
-      ['em_andamento', 'prestador_externo'].includes(t.status) ||
+      ['em_andamento', 'prestador_externo', 'pausada'].includes(t.status) ||
       dateWindow.includes((t.due_date || '').slice(0, 10))
     )
     const label = dateWindow.length === 3
@@ -513,6 +517,7 @@ async function handleCallback(chatId, msgId, queryId, data) {
       `▶️ *Tarefa #${tid} INICIADA!*\n\n📋 ${task.title}\n⏱ *Conclusão prevista:* ${fmtDate(task.sla_deadline)}\n🕐 Início: ${fmtDate(task.started_at)}\n\n_O tempo de execução está sendo medido._`,
       { inline_keyboard: [
         [{ text: '✅ FINALIZAR AGORA', callback_data: `done:${tid}` }],
+        [{ text: '⏸ Pausar', callback_data: `pause:${tid}` }],
         [{ text: '💬 Observação', callback_data: `obs:${tid}` }, { text: '📅 Nova Data', callback_data: `newdate:${tid}` }],
         [{ text: '🔙 Minhas Tarefas', callback_data: 'my_tasks' }],
       ]})
@@ -548,6 +553,29 @@ async function handleCallback(chatId, msgId, queryId, data) {
       { inline_keyboard: [
         [{ text: '✅ FINALIZAR TAREFA', callback_data: `done:${tid}` }],
         [{ text: '💬 Observação', callback_data: `obs:${tid}` }, { text: '📷 Enviar Foto', callback_data: `photo:${tid}` }],
+        [{ text: '🔙 Minhas Tarefas', callback_data: 'my_tasks' }],
+      ]})
+  }
+
+  // Pausar tarefa (pede o motivo)
+  if (data.startsWith('pause:')) {
+    const tid = parseInt(data.split(':')[1])
+    await setWait(chatId, 'pause', tid)
+    return edit(chatId, msgId,
+      `⏸ *Pausar — Tarefa #${tid}*\n\nDigite o *motivo* da pausa. Enquanto pausada, a tarefa não conta como atrasada.`,
+      { inline_keyboard: [[{ text: '❌ Cancelar', callback_data: `view:${tid}` }]] })
+  }
+
+  // Reiniciar tarefa pausada
+  if (data.startsWith('resume:')) {
+    const tid  = parseInt(data.split(':')[1])
+    const task = await updateTask(tid, chatId, { status: 'em_andamento' })
+    if (!task) return edit(chatId, msgId, '❌ Tarefa não encontrada.')
+    return edit(chatId, msgId,
+      `▶️ *Tarefa #${tid} REINICIADA!*\n\n📋 ${task.title}\n_O tempo de execução segue contando._`,
+      { inline_keyboard: [
+        [{ text: '✅ FINALIZAR AGORA', callback_data: `done:${tid}` }],
+        [{ text: '⏸ Pausar', callback_data: `pause:${tid}` }],
         [{ text: '🔙 Minhas Tarefas', callback_data: 'my_tasks' }],
       ]})
   }
@@ -648,6 +676,33 @@ async function handleText(chatId, user, text) {
       `💬 *Observação salva na tarefa #${tid}!*\n\n_${novaObs}_`,
       { inline_keyboard: [[
         { text: '👁 Ver tarefa', callback_data: `view:${tid}` },
+        { text: '🏠 Menu',       callback_data: 'menu' },
+      ]]})
+  }
+
+  // Pausar (motivo)
+  if (mode === 'pause') {
+    await clearWait(chatId)
+    const tid = wait.task_id
+    if (!tid) return send(chatId, '❌ Tarefa não encontrada.')
+    const { data: task } = await sb.from('tasks').select('*').eq('id', tid).maybeSingle()
+    if (!task) return send(chatId, '❌ Tarefa não encontrada.')
+    const prov    = await getProv(chatId)
+    const name    = prov?.name || 'Prestador'
+    const motivo  = text.trim()
+    const novaObs = `⏸ [${nowPtBR()}] ${name}: PAUSA — ${motivo}`
+    const obsAnt  = task.provider_obs || ''
+    const obsFinal = obsAnt ? `${obsAnt}\n${novaObs}` : novaObs
+    await updateTask(tid, chatId, { status: 'pausada' })
+    await Promise.all([
+      sb.from('tasks').update({ provider_obs: obsFinal }).eq('id', tid),
+      sb.from('task_history').insert({ task_id: tid, action: 'pausa',
+        old_value: '', new_value: motivo, changed_by: `tg:${name}` }),
+    ])
+    return send(chatId,
+      `⏸ *Tarefa #${tid} pausada!*\n\nMotivo: _${motivo}_\n\n_Não conta como atrasada enquanto pausada._`,
+      { inline_keyboard: [[
+        { text: '▶️ Reiniciar', callback_data: `resume:${tid}` },
         { text: '🏠 Menu',       callback_data: 'menu' },
       ]]})
   }
