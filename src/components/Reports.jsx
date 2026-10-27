@@ -278,12 +278,13 @@ function BIDashboard({ tasks, providers }) {
 
   // Card style helper
   const card = (extra = {}) => ({
-    background:'var(--s1)', border:'1px solid var(--border)',
-    borderRadius:12, padding:'1.1rem 1.25rem', ...extra
+    background:'#fff', border:'1px solid #e3e9f2',
+    borderRadius:16, padding:'1.15rem 1.3rem',
+    boxShadow:'0 1px 2px rgba(15,23,42,.04), 0 8px 24px -12px rgba(15,23,42,.12)', ...extra
   })
   const cardTitle = {
-    fontSize:'.68rem', fontWeight:700, letterSpacing:'.1em',
-    textTransform:'uppercase', color:'var(--muted)', marginBottom:'1rem',
+    fontSize:'.72rem', fontWeight:700, letterSpacing:'.1em',
+    textTransform:'uppercase', color:'#475569', marginBottom:'1rem',
   }
 
   return (
@@ -293,8 +294,8 @@ function BIDashboard({ tasks, providers }) {
       <div className="bi-kpi-strip" style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:'.6rem' }}>
         {kpis.map(k => (
           <div key={k.label} style={{
-            ...card(), padding:'.9rem 1rem',
-            borderBottom:`3px solid ${k.color}`,
+            ...card(), padding:'.95rem 1.05rem',
+            borderLeft:`4px solid ${k.color}`,
           }}>
             <div style={{ fontSize:'.62rem', fontWeight:700, letterSpacing:'.09em', textTransform:'uppercase', color:'var(--muted)', marginBottom:'.45rem' }}>
               {k.label}

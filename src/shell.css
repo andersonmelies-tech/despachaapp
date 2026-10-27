@@ -198,3 +198,98 @@ body { background: #eef2f8; }
 /* Selo de perfil legível sobre o topbar escuro */
 .topbar .role-badge { background: rgba(255,255,255,.16); color: #fff; border: 1px solid rgba(255,255,255,.28); }
 .topbar .role-badge.admin { background: rgba(245,124,20,.9); border-color: transparent; }
+
+/* ═══════════════════════════════════════════════════════════════
+   Telas internas: Tarefas, Relatórios, Configurações, modais
+   ═══════════════════════════════════════════════════════════════ */
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 1.1rem; }
+.page-head h2 { font-size: 1.5rem; font-weight: 800; letter-spacing: -.02em; color: #0f172a; line-height: 1.15; }
+.page-head p { font-size: .8rem; color: #64748b; margin-top: .2rem; }
+
+/* Botões */
+.btn-primary {
+  background: linear-gradient(135deg, #ff9a3d, #f57c14); color: #fff; border: none; border-radius: 10px;
+  box-shadow: 0 6px 16px -6px rgba(245,124,20,.65); letter-spacing: .01em;
+}
+.btn-primary:hover { filter: none; box-shadow: 0 10px 22px -8px rgba(245,124,20,.8); }
+.btn-primary:disabled { opacity: .55; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-sec, .btn-danger { border-radius: 10px; }
+.abtn { border-radius: 9px; }
+
+/* Barra de filtros */
+.ctrl-row.toolbar {
+  background: #fff; border: 1px solid #e3e9f2; border-radius: 14px; padding: .65rem .75rem;
+  box-shadow: var(--shadow-card);
+}
+.ctrl-row.toolbar .search-wrap { border: 1px solid transparent; background: #f4f7fb; border-radius: 10px; }
+.ctrl-row.toolbar .search-wrap:focus-within { background: #fff; border-color: #1B4F8A; box-shadow: 0 0 0 3px rgba(27,79,138,.12); }
+select { border-radius: 10px; background-color: #fff; }
+select:hover { border-color: #b6c3d6; }
+
+/* Box "Tarefas do dia" */
+.today-box {
+  background: #fff; border: 1px solid #e3e9f2; border-left: 4px solid var(--brand); border-radius: 14px;
+  padding: 1rem 1.25rem; box-shadow: var(--shadow-card);
+}
+
+/* Tabela de tarefas */
+.tbl-wrap { border: 1px solid #e3e9f2; border-radius: 16px; box-shadow: var(--shadow-card); background: #fff; }
+.tbl-head {
+  background: #f4f7fb; color: #64748b; font-family: var(--sans); font-weight: 700; font-size: .66rem;
+  letter-spacing: .1em; padding: .8rem 1.1rem; border-bottom: 1px solid #e3e9f2;
+}
+.trow { padding: .95rem 1.1rem; border-bottom: 1px solid #eef2f7; }
+.trow:hover { background: #f7faff; }
+.trow.is-late { box-shadow: inset 3px 0 0 var(--red); border-left: none; }
+.trow.is-critical { background: linear-gradient(90deg, rgba(220,38,38,.05), transparent 55%); }
+.tid { color: #94a3b8; }
+.ttitle { font-weight: 600; color: #0f172a; }
+.sla-bar-wrap { height: 4px; background: #eef2f7; border-radius: 99px; }
+.sla-bar { border-radius: 99px; }
+.empty { color: #94a3b8; }
+
+/* Abas (Relatórios / Configurações) */
+.stab-bar {
+  display: inline-flex; flex-wrap: wrap; gap: .3rem; padding: .35rem; margin-bottom: 1.25rem;
+  background: #fff; border: 1px solid #e3e9f2; border-radius: 14px; box-shadow: var(--shadow-card);
+}
+.stab { border: none; border-radius: 10px; padding: .55rem 1.05rem; color: #64748b; font-weight: 600; margin: 0; }
+.stab:hover { background: #f4f7fb; color: #0f172a; }
+.stab.active { background: #0f2a52; color: #fff; border: none; box-shadow: 0 6px 14px -6px rgba(15,42,82,.6); }
+
+/* Cartões de configuração */
+.cfg-card { background: #fff; border: 1px solid #e3e9f2; border-radius: 16px; padding: 1.35rem 1.4rem; box-shadow: var(--shadow-card); }
+.cfg-title { color: #0f172a; font-size: .95rem; font-weight: 700; padding-bottom: .85rem; border-bottom: 1px solid #eef2f7; margin-bottom: 1.1rem; }
+.provider-avatar { background: linear-gradient(135deg, #1B4F8A, #2563eb); color: #fff; font-weight: 700; }
+.provider-row { border-bottom: 1px solid #eef2f7; }
+.sector-tag { background: #f4f7fb; border-color: #e3e9f2; font-weight: 500; }
+.step-num { background: linear-gradient(135deg, #f57c14, #ff9a3d); box-shadow: 0 4px 12px -4px rgba(245,124,20,.6); }
+.rep-table th { background: #f4f7fb; border-bottom: 1px solid #e3e9f2; letter-spacing: .08em; }
+.rep-table th:first-child { border-radius: 10px 0 0 10px; }
+.rep-table th:last-child { border-radius: 0 10px 10px 0; }
+.rep-table tr:hover td { background: #f7faff; }
+.export-row { border-radius: 12px; }
+
+/* Formulários e modais */
+.finput { border-radius: 10px; background: #f8fafd; border-color: #e1e8f1; }
+.finput:focus { background: #fff; border-color: #1B4F8A; box-shadow: 0 0 0 3px rgba(27,79,138,.12); }
+.flabel { color: #64748b; font-weight: 700; letter-spacing: .08em; }
+.overlay { background: rgba(8,20,40,.62); backdrop-filter: blur(5px); }
+.modal { border: none; border-top: 4px solid var(--brand); border-radius: 18px; box-shadow: 0 30px 80px -20px rgba(8,20,40,.55); }
+.mhead { background: #fff; border-radius: 18px 18px 0 0; padding: 1.15rem 1.5rem; }
+.mtitle { font-family: var(--sans); font-size: 1rem; font-weight: 800; color: #0f172a; letter-spacing: -.01em; }
+.mclose { border-radius: 10px; }
+.mfoot { background: #f8fafd; border-radius: 0 0 18px 18px; }
+.toast { border-radius: 12px; box-shadow: 0 16px 40px -12px rgba(8,20,40,.5); }
+
+@media (max-width: 768px) {
+  .page-head h2 { font-size: 1.25rem; }
+  .stab-bar { display: flex; overflow-x: auto; flex-wrap: nowrap; }
+  .stab { white-space: nowrap; }
+}
+
+/* Coluna de status mais larga: "Em andamento" não quebra mais */
+@media (min-width: 769px) {
+  .tbl-head, .trow { grid-template-columns: 52px 1fr 130px 105px 150px 100px 95px 110px; }
+}
+.stbadge, .ubadge { white-space: nowrap; }
