@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
+import './shell.css'
 
 // ── Roteamento simples (sem dependência de router) ───────────────────────────
 const path = window.location.pathname

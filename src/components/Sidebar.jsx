@@ -1,19 +1,21 @@
+import Icon from './Icons.jsx'
+
 const NAV_ITEMS = [
-  { id: 'dashboard',   label: 'Dashboard',     icon: '▦'  },
-  { id: 'tasks',       label: 'Tarefas',       icon: '≡'  },
-  { id: 'recurrences', label: 'Recorrências',  icon: '🔄' },
-  { id: 'calendar',    label: 'Agenda',        icon: '📅' },
-  { id: 'reports',     label: 'Relatórios',    icon: '📊' },
-  { id: 'settings',    label: 'Configurações', icon: '⚙'  },
+  { id: 'dashboard',   label: 'Dashboard',     icon: 'dashboard'   },
+  { id: 'tasks',       label: 'Tarefas',       icon: 'tasks'       },
+  { id: 'recurrences', label: 'Recorrências',  icon: 'recurrences' },
+  { id: 'calendar',    label: 'Agenda',        icon: 'calendar'    },
+  { id: 'reports',     label: 'Relatórios',    icon: 'reports'     },
+  { id: 'settings',    label: 'Configurações', icon: 'settings'    },
 ]
 
 const FILTERS = [
-  { id: 'all',          label: 'Todas',        icon: '≡',  statKey: 'total',        cls: '' },
-  { id: 'pendente',     label: 'Pendentes',    icon: '⏳', statKey: 'pendente',     cls: 'bd-warn' },
-  { id: 'em_andamento', label: 'Em andamento', icon: '▶',  statKey: 'em_andamento', cls: 'bd-blue' },
-  { id: 'concluida',    label: 'Concluídas',   icon: '✓',  statKey: 'concluida',    cls: 'bd-green' },
-  { id: 'atrasadas',    label: 'Atrasadas',    icon: '!',  statKey: 'atrasadas',    cls: 'bd-red' },
-  { id: 'criticas',     label: 'Críticas',     icon: '⚠',  statKey: 'criticas',     cls: 'bd-red' },
+  { id: 'all',          label: 'Todas',        dot: '#94a3b8', statKey: 'total',        cls: '' },
+  { id: 'pendente',     label: 'Pendentes',    dot: '#f59e0b', statKey: 'pendente',     cls: 'bd-warn' },
+  { id: 'em_andamento', label: 'Em andamento', dot: '#60a5fa', statKey: 'em_andamento', cls: 'bd-blue' },
+  { id: 'concluida',    label: 'Concluídas',   dot: '#34d399', statKey: 'concluida',    cls: 'bd-green' },
+  { id: 'atrasadas',    label: 'Atrasadas',    dot: '#f87171', statKey: 'atrasadas',    cls: 'bd-red' },
+  { id: 'criticas',     label: 'Críticas',     dot: '#fb7185', statKey: 'criticas',     cls: 'bd-red' },
 ]
 
 export default function Sidebar({ tab, setTab, sideFilter, setSideFilter, stats, isSuperAdmin, plan, pendingRequests }) {
@@ -32,7 +34,7 @@ export default function Sidebar({ tab, setTab, sideFilter, setSideFilter, stats,
             className={`sb-item${tab === item.id ? ' active' : ''}`}
             onClick={() => setTab(item.id)}
           >
-            <span className="sb-icon">{item.icon}</span>
+            <Icon name={item.icon} size={18} className="sb-icon" />
             <span className="sb-label-text">{item.label}</span>
             {item.id === 'tasks' && s.atrasadas > 0 && (
               <span className="badge bd-red">{s.atrasadas}</span>
@@ -48,7 +50,7 @@ export default function Sidebar({ tab, setTab, sideFilter, setSideFilter, stats,
           className={`sb-item${tab === 'requests' ? ' active' : ''}`}
           onClick={() => setTab('requests')}
         >
-          <span className="sb-icon">📥</span>
+          <Icon name="inbox" size={18} className="sb-icon" />
           <span className="sb-label-text">Fila de Pedidos</span>
           {pendingRequests > 0 && (
             <span className="badge bd-red">{pendingRequests}</span>
@@ -84,9 +86,9 @@ export default function Sidebar({ tab, setTab, sideFilter, setSideFilter, stats,
             className={`sb-item sb-admin${tab === 'admin' ? ' active' : ''}`}
             onClick={() => setTab('admin')}
           >
-            <span className="sb-icon">🛡️</span>
+            <Icon name="shield" size={18} className="sb-icon" />
             <span className="sb-label-text">Admin</span>
-            <span className="badge" style={{ background: '#9b59f522', color: 'var(--purple)', border: '1px solid #9b59f544' }}>SYS</span>
+            <span className="badge" style={{ background: 'rgba(167,139,250,.2)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,.35)' }}>SYS</span>
           </div>
         </div>
       )}
@@ -106,7 +108,7 @@ export default function Sidebar({ tab, setTab, sideFilter, setSideFilter, stats,
               className={`sb-item sb-filter${sideFilter === f.id ? ' active' : ''}`}
               onClick={() => setSideFilter(f.id)}
             >
-              <span className="sb-icon">{f.icon}</span>
+              <span className="sb-dot" style={{ background: f.dot }} />
               <span className="sb-label-text">{f.label}</span>
               {s[f.statKey] != null && (
                 <span className={`badge${f.cls ? ' ' + f.cls : ''}`}>{s[f.statKey]}</span>
