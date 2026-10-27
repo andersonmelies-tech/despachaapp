@@ -1,4 +1,6 @@
-const ROLE_LABEL = { admin: 'Admin', manager: 'Gerente', operator: 'Operador', viewer: 'Visualizador' }
+import Icon from './Icons.jsx'
+
+const ROLE_LABEL ={ admin: 'Admin', manager: 'Gerente', operator: 'Operador', viewer: 'Visualizador' }
 
 export default function Topbar({ user, onLogout }) {
   return (
@@ -24,7 +26,7 @@ export default function Topbar({ user, onLogout }) {
           </div>
         </div>
         <button className="logout-btn" onClick={onLogout} title="Sair">
-          ⏻ Sair
+          <Icon name="logout" size={15} /> Sair
         </button>
       </div>
     </div>

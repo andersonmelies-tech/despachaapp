@@ -81,7 +81,7 @@ export async function uploadTaskPhoto(base64, prefix = 'task') {
 // ── Stat query ────────────────────────────────────────────────────────────────
 // Seleciona APENAS as colunas necessárias para o cálculo — evita baixar
 // photos (base64), description, requester_phone, etc.
-const STATS_COLS = 'id,status,urgency,due_date,sla_deadline,elapsed_minutes,assignee_id,sector,recurrence_id'
+const STATS_COLS = 'id,title,assignee,status,urgency,due_date,sla_deadline,created_at,completed_at,elapsed_minutes,assignee_id,sector,recurrence_id'
 const STATS_CACHE_KEY = 'dsp_stats_cache'
 
 // Lê cache do sessionStorage (dura enquanto a aba está aberta)
@@ -148,7 +148,36 @@ export async function fetchStats() {
   })
   const por_setor = Object.values(setorMap).sort((a,b) => b.total - a.total)
 
-  const result = { total, pendente, em_andamento: em_and, concluida, cancelada, cadastrada, atrasadas, criticas, avg_minutes, por_prestador, por_setor }
+  // Tendência dos últimos 14 dias (criadas × concluídas), no fuso local
+  const dayKey = d => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}` }
+  const tendencia = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (13 - i))
+    return { dia: dayKey(d), criadas: 0, concluidas: 0 }
+  })
+  const byDay = Object.fromEntries(tendencia.map(x => [x.dia, x]))
+  active$.forEach(t => {
+    if (t.created_at   && byDay[dayKey(t.created_at)])   byDay[dayKey(t.created_at)].criadas++
+    if (t.completed_at && byDay[dayKey(t.completed_at)]) byDay[dayKey(t.completed_at)].concluidas++
+  })
+
+  // Abertas por urgência
+  const por_urgencia = { critica: 0, alta: 0, media: 0, baixa: 0 }
+  active$.filter(t => t.status !== 'concluida').forEach(t => { if (t.urgency in por_urgencia) por_urgencia[t.urgency]++ })
+
+  // SLA cumprido: concluídas dentro do prazo / concluídas com SLA
+  const comSla = active$.filter(t => t.status === 'concluida' && t.sla_deadline && t.completed_at)
+  const sla_cumprido = comSla.length
+    ? Math.round(comSla.filter(t => new Date(t.completed_at) <= new Date(t.sla_deadline)).length * 100 / comSla.length)
+    : null
+
+  // Requer atenção: abertas atrasadas ou críticas (atrasadas primeiro)
+  const atencao = active$
+    .filter(t => !['concluida', 'pausada'].includes(t.status) && (isOverdue(t) || t.urgency === 'critica'))
+    .map(t => ({ id: t.id, title: t.title, assignee: t.assignee, due_date: t.due_date, urgency: t.urgency, late: !!isOverdue(t) }))
+    .sort((a, b) => (b.late - a.late) || (a.due_date || '9').localeCompare(b.due_date || '9'))
+    .slice(0, 6)
+
+  const result = { total, pendente, em_andamento: em_and, concluida, cancelada, cadastrada, atrasadas, criticas, avg_minutes, por_prestador, por_setor, tendencia, por_urgencia, sla_cumprido, atencao }
   setStatsCache(result)   // salva para próxima abertura da aba
   return result
 }
