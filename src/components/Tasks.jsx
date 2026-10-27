@@ -205,12 +205,16 @@ export default function Tasks({ showToast, sideFilter, user, plan, onStatsChange
 
   return (
     <div>
+      <div className="page-head">
+        <div>
+          <h2>Tarefas</h2>
+          <p>{loading ? 'Carregando…' : `${list.length} de ${tasks.length} tarefa${tasks.length !== 1 ? 's' : ''}`}</p>
+        </div>
+      </div>
+
       {/* ── Box: Tarefas do dia ── */}
       {tarefasHoje.length > 0 && (
-        <div style={{
-          background: 'var(--s1)', border: '1px solid var(--border)', borderRadius: 'var(--radius)',
-          padding: '1rem 1.25rem', marginBottom: '1rem',
-        }}>
+        <div className="today-box" style={{ marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.75rem' }}>
             <span style={{ fontWeight: 700, fontSize: '.85rem', color: 'var(--text)' }}>
               📅 Tarefas do dia — prazo hoje
@@ -267,7 +271,7 @@ export default function Tasks({ showToast, sideFilter, user, plan, onStatsChange
       )}
 
       {/* Controles */}
-      <div className="ctrl-row">
+      <div className="ctrl-row toolbar">
         <div className="search-wrap">
           {refreshing ? <span style={{ fontSize: '.75rem', animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</span> : '🔍'}
           <input placeholder="Buscar tarefas…" value={search} onChange={e => setSearch(e.target.value)} />
