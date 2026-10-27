@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { supabase, isOverdue } from '../lib/supabase.js'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import Icon from './Icons.jsx'
+import { Donut, Gauge, HBars, COLORS } from './Charts.jsx'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -68,90 +70,6 @@ function taskToRow(t) {
   }
 }
 
-// ── SVG Chart helpers ─────────────────────────────────────────────────────────
-
-function polar(cx, cy, r, deg) {
-  const rad = (deg - 90) * Math.PI / 180
-  return [+(cx + r * Math.cos(rad)).toFixed(2), +(cy + r * Math.sin(rad)).toFixed(2)]
-}
-
-function DonutChart({ segments, size = 200 }) {
-  const cx = size / 2, cy = size / 2
-  const R = size * 0.42, r = size * 0.265
-  const total = segments.reduce((s, d) => s + d.value, 0)
-  if (total === 0) return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle cx={cx} cy={cy} r={(R+r)/2} fill="none" stroke="var(--border)" strokeWidth={R-r} />
-      <text x={cx} y={cy+5} textAnchor="middle" fontSize="11" fill="var(--muted)">Sem dados</text>
-    </svg>
-  )
-  let angle = 0
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ overflow:'visible' }}>
-      {segments.filter(s => s.value > 0).map((seg, i) => {
-        const sweep = (seg.value / total) * 360
-        const gap = sweep > 6 ? 2.5 : 0
-        const s = angle + gap, e = angle + sweep - gap
-        angle += sweep
-        if (e <= s + 0.1) return null
-        const [x1,y1] = polar(cx,cy,R,s), [x2,y2] = polar(cx,cy,R,e)
-        const [x3,y3] = polar(cx,cy,r,e), [x4,y4] = polar(cx,cy,r,s)
-        const lg = (e - s) > 180 ? 1 : 0
-        return <path key={i} d={`M${x1},${y1} A${R},${R} 0 ${lg},1 ${x2},${y2} L${x3},${y3} A${r},${r} 0 ${lg},0 ${x4},${y4}Z`} fill={seg.color} />
-      })}
-      <text x={cx} y={cy-2} textAnchor="middle" fontSize={size*.155} fontWeight="900" fill="var(--text)" fontFamily="inherit">{total}</text>
-      <text x={cx} y={cy+size*.12} textAnchor="middle" fontSize={size*.07} fill="var(--muted)" fontFamily="inherit">tarefas</text>
-    </svg>
-  )
-}
-
-function HalfGauge({ pct, size = 160 }) {
-  // Semicírculo vai de LEFT (270° no sistema polar) até RIGHT (90°), passando pelo TOP (0°) no sentido horário
-  const pad = 14
-  const W   = size + pad * 2
-  const cx  = W / 2
-  const cy  = size * 0.52          // linha base do arco
-  const R   = size * 0.40
-  const sw  = size * 0.09
-  const H   = cy + 24              // espaço para os labels de borda
-
-  const cap = Math.min(Math.max(pct, 0), 100)
-  const col = cap >= 80 ? '#00c896' : cap >= 50 ? '#ffb347' : '#ff4d6a'
-
-  // Pontos fixos do arco
-  const lx = cx - R, rx = cx + R  // extremo esquerdo e direito
-
-  // 0% → 270° (LEFT), 50% → 0° (TOP), 100% → 90° (RIGHT)
-  const vdeg = (270 + cap * 1.8) % 360
-  const [vx, vy] = polar(cx, cy, R, vdeg)
-
-  // large-arc=0 sempre (nunca ultrapassa 180° neste gauge)
-  // sweep=1 (horário no SVG = vai para cima a partir da esquerda)
-  return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-      {/* Trilha de fundo */}
-      <path d={`M${lx},${cy} A${R},${R} 0 0,1 ${rx},${cy}`}
-        fill="none" stroke="var(--border)" strokeWidth={sw} strokeLinecap="round" />
-      {/* Arco preenchido */}
-      {cap > 0 && (
-        <path d={`M${lx},${cy} A${R},${R} 0 0,1 ${vx},${vy}`}
-          fill="none" stroke={col} strokeWidth={sw} strokeLinecap="round"
-          style={{ WebkitPrintColorAdjust:'exact', printColorAdjust:'exact' }} />
-      )}
-      {/* Ponteiro */}
-      <circle cx={vx} cy={vy} r={sw * 0.65} fill="white" stroke={col} strokeWidth={2.5} />
-      {/* Percentual centralizado */}
-      <text x={cx} y={cy - R * 0.22} textAnchor="middle"
-        fontSize={size * 0.22} fontWeight="900" fill={col} fontFamily="inherit">{pct}%</text>
-      {/* Labels de borda */}
-      <text x={lx + sw * 0.4} y={H - 5} textAnchor="middle"
-        fontSize={size * 0.063} fill="var(--muted)" fontFamily="inherit">0%</text>
-      <text x={rx - sw * 0.4} y={H - 5} textAnchor="middle"
-        fontSize={size * 0.063} fill="var(--muted)" fontFamily="inherit">100%</text>
-    </svg>
-  )
-}
-
 // ── Cabeçalho de impressão ────────────────────────────────────────────────────
 
 function ReportPrintHeader({ periodLabel, activeFilters, tasks, companyName }) {
@@ -205,8 +123,8 @@ function ReportPrintHeader({ periodLabel, activeFilters, tasks, companyName }) {
 // ── BI Dashboard ──────────────────────────────────────────────────────────────
 
 const BI = {
-  success: '#00c896', warn: '#ffb347', critical: '#ff4d6a',
-  blue: '#3b6fe8', purple: '#7c6de8', gray: '#6b7a90',
+  success: COLORS.green, warn: COLORS.warn, critical: COLORS.red,
+  blue: COLORS.blue, purple: COLORS.purple, gray: COLORS.gray,
 }
 
 function BIDashboard({ tasks, providers }) {
@@ -264,215 +182,113 @@ function BIDashboard({ tasks, providers }) {
     .sort((a,b) => b.total - a.total).slice(0, 8)
   const maxSec = Math.max(...sectorRows.map(r => r.total), 1)
 
+  const pctColor = p => p >= 80 ? COLORS.green : p >= 50 ? COLORS.orange : COLORS.red
+
   const kpis = [
-    { label:'Total',        val: total,            suf:'',  color: BI.blue,    dot:'■' },
-    { label:'Concluídas',   val: concluidas,        suf:'',  color: BI.success, dot:'■' },
-    { label:'% Conclusão',  val: concPct,           suf:'%', color: concPct>=80?BI.success:concPct>=50?BI.warn:BI.critical, dot:'▲' },
-    { label:'Em Execução',  val: emAnd,             suf:'',  color: BI.purple,  dot:'■' },
-    { label:'Atrasadas',    val: atrasadas,         suf:'',  color: atrasadas>0?BI.critical:BI.success, dot: atrasadas>0?'▲':'■' },
-    { label:'Tempo Médio',  val: fmtHours(avgMin),  suf:'',  color: '#0ea5e9',  dot:'■', mono:true },
+    { label: 'Total',       val: total,           suf: '',  color: '#64748b', icon: 'list',   foot: 'no período selecionado' },
+    { label: 'Concluídas',  val: concluidas,      suf: '',  color: '#16a34a', icon: 'check',  foot: `de ${total} tarefas` },
+    { label: 'Conclusão',   val: concPct,         suf: '%', color: pctColor(concPct), icon: 'reports', foot: 'concluídas sobre o total' },
+    { label: 'Em execução', val: emAnd,           suf: '',  color: '#2563eb', icon: 'wrench', foot: 'em andamento ou externo' },
+    { label: 'Atrasadas',   val: atrasadas,       suf: '',  color: atrasadas > 0 ? '#dc2626' : '#16a34a', icon: 'alert', foot: atrasadas > 0 ? 'fora do prazo ou SLA' : 'tudo no prazo' },
+    { label: 'Tempo médio', val: fmtHours(avgMin), suf: '', color: '#7c3aed', icon: 'bolt',   foot: 'por tarefa concluída' },
   ]
-
-  const medal = ['🥇','🥈','🥉']
-  const pctColor = p => p >= 80 ? BI.success : p >= 50 ? BI.warn : BI.critical
-
-  // Card style helper
-  const card = (extra = {}) => ({
-    background:'#fff', border:'1px solid #e3e9f2',
-    borderRadius:16, padding:'1.15rem 1.3rem',
-    boxShadow:'0 1px 2px rgba(15,23,42,.04), 0 8px 24px -12px rgba(15,23,42,.12)', ...extra
-  })
-  const cardTitle = {
-    fontSize:'.72rem', fontWeight:700, letterSpacing:'.1em',
-    textTransform:'uppercase', color:'#475569', marginBottom:'1rem',
-  }
+  const urgAtencao = urgSegs[0].value + urgSegs[1].value
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:'.9rem' }}>
+    <div className="rep-stack">
 
-      {/* ── KPI Strip ── */}
-      <div className="bi-kpi-strip" style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:'.6rem' }}>
+      <div className="dash-kpi-grid">
         {kpis.map(k => (
-          <div key={k.label} style={{
-            ...card(), padding:'.95rem 1.05rem',
-            borderLeft:`4px solid ${k.color}`,
-          }}>
-            <div style={{ fontSize:'.62rem', fontWeight:700, letterSpacing:'.09em', textTransform:'uppercase', color:'var(--muted)', marginBottom:'.45rem' }}>
-              {k.label}
+          <div key={k.label} className="dash-kpi" style={{ '--card-color': k.color }}>
+            <div className="dash-kpi-top">
+              <span className="dash-kpi-label">{k.label}</span>
+              <span className="dash-kpi-icon"><Icon name={k.icon} size={16} stroke={2} /></span>
             </div>
-            <div style={{
-              fontSize:'1.85rem', fontWeight:900, color:k.color, lineHeight:1,
-              fontVariantNumeric:'tabular-nums',
-              fontFamily: k.mono ? 'var(--mono)' : 'inherit',
-            }}>{k.val}{k.suf}</div>
+            <div className="dash-kpi-val">{k.val}{k.suf}</div>
+            <div className="dash-kpi-foot">{k.foot}</div>
           </div>
         ))}
       </div>
 
-      {/* ── Charts Triptych ── */}
-      <div className="bi-charts-row" style={{ display:'grid', gridTemplateColumns:'1.15fr 1fr 0.95fr', gap:'.9rem' }}>
-
-        {/* Status Donut */}
-        <div style={card()}>
-          <div style={cardTitle}>Distribuição por Status</div>
-          <div style={{ display:'flex', alignItems:'center', gap:'1.1rem' }}>
-            <div style={{ flexShrink:0 }}>
-              <DonutChart segments={statusSegs} size={160} />
-            </div>
-            <div style={{ flex:1, display:'flex', flexDirection:'column', gap:'.48rem' }}>
-              {statusSegs.map(s => (
-                <div key={s.key} style={{ display:'flex', alignItems:'center', gap:'.5rem' }}>
-                  <span style={{ width:8, height:8, borderRadius:2, background:s.color, flexShrink:0 }} />
-                  <span style={{ flex:1, fontSize:'.75rem', color:'var(--text)' }}>{s.label}</span>
-                  <span style={{ fontSize:'.78rem', fontWeight:800, color:s.color, fontVariantNumeric:'tabular-nums', minWidth:22, textAlign:'right' }}>{s.value}</span>
-                  <span style={{ fontSize:'.65rem', color:'var(--muted)', minWidth:30, textAlign:'right' }}>
-                    {total ? Math.round(s.value/total*100) : 0}%
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+      <div className="dash-grid">
+        <div className="dash-panel span-4">
+          <div className="dash-panel-head"><div><div className="dash-section-title">Distribuição por status</div><div className="dash-section-sub">Todas as tarefas do período</div></div></div>
+          <Donut
+            centerValue={total} centerLabel="tarefas"
+            segments={statusSegs.map(s => ({ label: s.label, value: s.value, color: s.color }))}
+          />
         </div>
 
-        {/* Urgency bars */}
-        <div style={card()}>
-          <div style={cardTitle}>Distribuição por Urgência</div>
-          <div style={{ display:'flex', flexDirection:'column', gap:'.8rem' }}>
-            {urgSegs.map(u => (
-              <div key={u.label}>
-                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'.22rem' }}>
-                  <span style={{ fontSize:'.78rem', fontWeight:600, color:'var(--text)' }}>{u.label}</span>
-                  <span style={{ fontSize:'.78rem', fontWeight:800, color:u.color, fontVariantNumeric:'tabular-nums' }}>{u.value}</span>
-                </div>
-                <div style={{ height:10, background:'var(--s2)', borderRadius:5, overflow:'hidden' }}>
-                  <div style={{ height:'100%', width:`${(u.value/maxUrg)*100}%`, background:u.color, borderRadius:5,
-                    WebkitPrintColorAdjust:'exact', printColorAdjust:'exact' }} />
-                </div>
-              </div>
-            ))}
-          </div>
-          {(urgSegs[0].value + urgSegs[1].value) > 0 && (
-            <div style={{ marginTop:'.9rem', padding:'.45rem .7rem', background:'#ff4d6a12',
-              border:'1px solid #ff4d6a44', borderRadius:7, fontSize:'.72rem', color:BI.critical, fontWeight:600,
-              display:'flex', alignItems:'center', gap:'.4rem' }}>
-              <span>⚠</span>
-              <span>{urgSegs[0].value + urgSegs[1].value} tarefas críticas / altas requerem atenção</span>
+        <div className="dash-panel span-4">
+          <div className="dash-panel-head"><div><div className="dash-section-title">Distribuição por urgência</div><div className="dash-section-sub">Inclui tarefas já concluídas</div></div></div>
+          <HBars rows={urgSegs.map(u => ({ label: u.label, right: u.value, max: maxUrg, parts: [{ value: u.value, color: u.color }] }))} />
+          {urgAtencao > 0 && (
+            <div className="rep-callout">
+              <Icon name="alert" size={15} />
+              {urgAtencao} tarefa{urgAtencao !== 1 ? 's' : ''} crítica{urgAtencao !== 1 ? 's' : ''} ou de urgência alta
             </div>
           )}
         </div>
 
-        {/* SLA Gauge */}
-        <div className="bi-sla-card" style={{ ...card(), display:'flex', flexDirection:'column', alignItems:'center' }}>
-          <div style={{ ...cardTitle, alignSelf:'flex-start', width:'100%' }}>Índice de SLA</div>
-          <HalfGauge pct={slaPct} size={174} />
-          <div className="bi-sla-stats" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'.45rem', width:'100%', marginTop:'.6rem' }}>
+        <div className="dash-panel span-4">
+          <div className="dash-panel-head"><div><div className="dash-section-title">Cumprimento de SLA</div><div className="dash-section-sub">Tarefas encerradas dentro do prazo</div></div></div>
+          <Gauge value={withSla.length ? slaPct : null} />
+          <div className="rep-tiles">
             {[
-              { label:'No prazo', val: slaOk,              color: BI.success  },
-              { label:'Atrasadas',val: withSla.length-slaOk, color: BI.critical },
-              { label:'Avaliadas', val: withSla.length,    color: 'var(--muted)' },
-              { label:'Sem SLA',   val: total - withSla.length, color:'var(--muted)' },
+              { label: 'No prazo',  val: slaOk,                  color: COLORS.green },
+              { label: 'Fora do prazo', val: withSla.length - slaOk, color: COLORS.red },
+              { label: 'Avaliadas', val: withSla.length,         color: '#0f172a' },
+              { label: 'Sem SLA',   val: total - withSla.length, color: '#64748b' },
             ].map(c => (
-              <div key={c.label} style={{ textAlign:'center', padding:'.4rem .3rem', background:'var(--s2)', borderRadius:7 }}>
-                <div style={{ fontSize:'1.05rem', fontWeight:900, color:c.color, fontVariantNumeric:'tabular-nums' }}>{c.val}</div>
-                <div style={{ fontSize:'.6rem', color:'var(--muted)', marginTop:'.1rem', letterSpacing:'.04em' }}>{c.label}</div>
-              </div>
+              <div key={c.label}><strong style={{ color: c.color }}>{c.val}</strong><span>{c.label}</span></div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* ── Leaderboard + Sectors ── */}
-      <div className="bi-bottom-row" style={{ display:'grid', gridTemplateColumns:'1.25fr 1fr', gap:'.9rem' }}>
-
-        {/* Provider Leaderboard */}
-        <div style={card()}>
-          <div style={cardTitle}>Ranking de Colaboradores — Taxa de conclusão</div>
+      <div className="dash-grid">
+        <div className="dash-panel span-7">
+          <div className="dash-panel-head"><div><div className="dash-section-title">Ranking de colaboradores</div><div className="dash-section-sub">Taxa de conclusão no período</div></div></div>
           {provRows.length === 0 ? (
             <div className="empty">Sem dados no período</div>
-          ) : (
-            <div style={{ display:'flex', flexDirection:'column', gap:'.55rem' }}>
-              {provRows.slice(0,8).map((p,i) => (
-                <div key={p.id} style={{ display:'flex', alignItems:'center', gap:'.7rem' }}>
-                  {/* Position badge */}
-                  <span style={{
-                    width:24, height:24, borderRadius:6, flexShrink:0, fontSize:'.75rem', fontWeight:800,
-                    display:'flex', alignItems:'center', justifyContent:'center',
-                    background: i<3 ? ['#fbbf2420','#94a3b820','#d9770620'][i] : 'var(--s2)',
-                    color: i<3 ? ['#fbbf24','#94a3b8','#d97706'][i] : 'var(--muted)',
-                  }}>
-                    {i < 3 ? medal[i] : i+1}
-                  </span>
-                  {/* Name */}
-                  <span style={{ flex:1, fontSize:'.8rem', fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.name}</span>
-                  {/* Score fraction */}
-                  <span style={{ fontSize:'.7rem', color:'var(--muted)', fontVariantNumeric:'tabular-nums', minWidth:38, textAlign:'right' }}>
-                    {p.conc}/{p.total}
-                  </span>
-                  {/* Bar */}
-                  <div style={{ width:90, height:7, background:'var(--s2)', borderRadius:99, overflow:'hidden', flexShrink:0 }}>
-                    <div style={{ height:'100%', width:`${p.pct}%`, background:pctColor(p.pct), borderRadius:99,
-                      WebkitPrintColorAdjust:'exact', printColorAdjust:'exact' }} />
-                  </div>
-                  {/* Pct */}
-                  <span style={{ fontSize:'.75rem', fontWeight:800, color:pctColor(p.pct), minWidth:34, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>
-                    {p.pct}%
-                  </span>
-                  {/* Overdue badge */}
-                  {p.atr > 0 && (
-                    <span style={{ fontSize:'.6rem', background:'#ff4d6a18', color:BI.critical, border:'1px solid #ff4d6a44',
-                      borderRadius:4, padding:'1px 5px', fontWeight:700, flexShrink:0 }}>
-                      {p.atr}⚠
-                    </span>
-                  )}
-                </div>
-              ))}
+          ) : provRows.slice(0, 8).map((p, i) => (
+            <div key={p.id} className="dash-rank">
+              <span className="dash-rank-pos">{i + 1}</span>
+              <span className="dash-provider-avatar">{initials(p.name)}</span>
+              <div className="dash-rank-info">
+                <div className="dash-provider-name">{p.name}</div>
+                <div className="dash-rank-meta">{p.conc} de {p.total} concluídas{p.atr > 0 ? ` · ${p.atr} atrasada${p.atr !== 1 ? 's' : ''}` : ''}{p.avg ? ` · ${fmtHours(p.avg)} em média` : ''}</div>
+                <div className="hbar-track thin"><i style={{ width: `${p.pct}%`, background: pctColor(p.pct) }} /></div>
+              </div>
+              <div className="dash-rank-pct" style={{ color: pctColor(p.pct) }}>{p.pct}%<small>concluído</small></div>
             </div>
-          )}
+          ))}
         </div>
 
-        {/* Sector Matrix */}
-        <div style={card()}>
-          <div style={cardTitle}>Setores — Volume e conclusão</div>
+        <div className="dash-panel span-5">
+          <div className="dash-panel-head">
+            <div><div className="dash-section-title">Setores</div><div className="dash-section-sub">Volume e conclusão</div></div>
+            <div className="dash-legend">
+              <span><i style={{ background: COLORS.green }} />Concluídas</span>
+              <span><i style={{ background: COLORS.red }} />Atrasadas</span>
+            </div>
+          </div>
           {sectorRows.length === 0 ? (
             <div className="empty">Sem dados</div>
           ) : (
-            <div style={{ display:'flex', flexDirection:'column', gap:'.6rem' }}>
-              {sectorRows.map(s => (
-                <div key={s.sector}>
-                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'.18rem' }}>
-                    <span style={{ fontSize:'.75rem', fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1, paddingRight:8 }}>
-                      {s.sector}
-                    </span>
-                    <span style={{ fontSize:'.7rem', color:'var(--muted)', fontVariantNumeric:'tabular-nums', flexShrink:0 }}>
-                      {s.conc}/{s.total} &nbsp;
-                      <span style={{ color:pctColor(s.pct), fontWeight:700 }}>{s.pct}%</span>
-                    </span>
-                  </div>
-                  {/* Stacked bar: concluída + restante */}
-                  <div style={{ height:8, background:'var(--s2)', borderRadius:4, overflow:'hidden', display:'flex' }}>
-                    <div style={{ height:'100%', width:`${s.conc/maxSec*100}%`, background:BI.success,
-                      WebkitPrintColorAdjust:'exact', printColorAdjust:'exact' }} />
-                    {s.atr > 0 && (
-                      <div style={{ height:'100%', width:`${s.atr/maxSec*100}%`, background:BI.critical,
-                        WebkitPrintColorAdjust:'exact', printColorAdjust:'exact' }} />
-                    )}
-                  </div>
-                </div>
-              ))}
-              {/* Legend */}
-              <div style={{ display:'flex', gap:'1rem', marginTop:'.4rem' }}>
-                {[['Concluídas', BI.success],['Atrasadas', BI.critical]].map(([l,c]) => (
-                  <span key={l} style={{ display:'flex', alignItems:'center', gap:'.3rem', fontSize:'.65rem', color:'var(--muted)' }}>
-                    <span style={{ width:8, height:8, borderRadius:2, background:c, flexShrink:0 }} />{l}
-                  </span>
-                ))}
-              </div>
-            </div>
+            <HBars rows={sectorRows.map(s => ({
+              label: s.sector, right: `${s.conc}/${s.total} · ${s.pct}%`, max: maxSec,
+              parts: [{ value: s.conc, color: COLORS.green }, { value: s.atr, color: COLORS.red }],
+            }))} />
           )}
         </div>
       </div>
     </div>
   )
+}
+
+function initials(name) {
+  return (name || '?').split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()
 }
 
 // ── Tab 2 — Por Prestador ──────────────────────────────────────────────────────
@@ -512,57 +328,56 @@ function ProviderTab({ tasks, providers }) {
     })
   }, [tasks, providers, sortKey, sortAsc])
 
-  function Th({ k, label }) {
+  function Th({ k, label, num }) {
     return (
-      <th onClick={() => toggleSort(k)}>
-        {label} {sortKey === k ? (sortAsc ? '↑' : '↓') : ''}
+      <th className={num ? 'num' : ''} onClick={() => toggleSort(k)}>
+        {label}{sortKey === k ? (sortAsc ? ' ↑' : ' ↓') : ''}
       </th>
     )
   }
 
   return (
-    <div className="cfg-card" style={{ overflowX: 'auto' }}>
-      <div className="cfg-title" style={{ marginBottom: '.85rem' }}>👤 Desempenho por Colaborador</div>
+    <div className="dash-panel">
+      <div className="dash-panel-head"><div><div className="dash-section-title">Desempenho por colaborador</div><div className="dash-section-sub">Clique no cabeçalho de uma coluna para ordenar</div></div></div>
       {rows.length === 0 ? (
         <div className="empty">Nenhum colaborador com tarefas no período</div>
       ) : (
-        <table className="rep-table">
-          <thead>
-            <tr>
-              <Th k="name"         label="Colaborador" />
-              <Th k="total"        label="Total" />
-              <Th k="concluidas"   label="✅ Concluídas" />
-              <Th k="em_andamento" label="🔧 Andamento" />
-              <Th k="atrasadas"    label="⚠️ Atrasadas" />
-              <Th k="avgMin"       label="⏱ Tempo médio" />
-              <Th k="pct"          label="% Conclusão" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => (
-              <tr key={r.id} style={{ background: i % 2 === 0 ? 'var(--s1)' : 'var(--s2)' }}>
-                <td style={{ fontWeight: 700 }}>{r.name}</td>
-                <td style={{ fontFamily: 'var(--mono)', fontWeight: 600, textAlign: 'center' }}>{r.total}</td>
-                <td style={{ color: '#10b981', fontFamily: 'var(--mono)', fontWeight: 600, textAlign: 'center' }}>{r.concluidas}</td>
-                <td style={{ color: 'var(--blue)', fontFamily: 'var(--mono)', textAlign: 'center' }}>{r.em_andamento}</td>
-                <td style={{ textAlign: 'center' }}>
-                  {r.atrasadas > 0
-                    ? <span style={{ background: '#fef2f2', color: '#ef4444', borderRadius: 6, padding: '2px 8px', fontWeight: 700, fontFamily: 'var(--mono)' }}>{r.atrasadas}</span>
-                    : <span style={{ color: 'var(--muted)', fontFamily: 'var(--mono)' }}>0</span>}
-                </td>
-                <td style={{ fontFamily: 'var(--mono)', color: 'var(--muted)', textAlign: 'center' }}>{fmtHours(r.avgMin)}</td>
-                <td style={{ minWidth: 130 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-                    <div style={{ flex: 1, height: 7, background: 'var(--s2)', borderRadius: 99, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${r.pct}%`, background: r.pct >= 80 ? '#10b981' : r.pct >= 50 ? '#f59e0b' : '#ef4444', borderRadius: 99, WebkitPrintColorAdjust:'exact', printColorAdjust:'exact' }} />
-                    </div>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', minWidth: 32, fontWeight: 700 }}>{r.pct}%</span>
-                  </div>
-                </td>
+        <div className="rep-table-wrap">
+          <table className="rep-table">
+            <thead>
+              <tr>
+                <Th k="name"         label="Colaborador" />
+                <Th k="total"        label="Total" num />
+                <Th k="concluidas"   label="Concluídas" num />
+                <Th k="em_andamento" label="Em andamento" num />
+                <Th k="atrasadas"    label="Atrasadas" num />
+                <Th k="avgMin"       label="Tempo médio" num />
+                <Th k="pct"          label="Conclusão" />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map(r => {
+                const col = r.pct >= 80 ? COLORS.green : r.pct >= 50 ? COLORS.orange : COLORS.red
+                return (
+                  <tr key={r.id}>
+                    <td className="strong">{r.name}</td>
+                    <td className="num">{r.total}</td>
+                    <td className="num">{r.concluidas}</td>
+                    <td className="num">{r.em_andamento}</td>
+                    <td className="num">{r.atrasadas > 0 ? <span className="rep-pill late">{r.atrasadas}</span> : <span className="muted">0</span>}</td>
+                    <td className="num muted">{fmtHours(r.avgMin)}</td>
+                    <td className="bar-cell">
+                      <div className="bar-line">
+                        <div className="hbar-track thin"><i style={{ width: `${r.pct}%`, background: col }} /></div>
+                        <span>{r.pct}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )
@@ -586,57 +401,53 @@ function SectorTab({ tasks }) {
   const maxTotal = Math.max(...rows.map(r => r.total), 1)
 
   return (
-    <div className="cfg-card">
-      <div className="cfg-title" style={{ marginBottom: '.85rem' }}>🏢 Desempenho por Setor</div>
-      {rows.length === 0 ? (
-        <div className="empty">Nenhuma tarefa no período</div>
-      ) : (
-        <>
-          <table className="rep-table" style={{ marginBottom: '1.5rem' }}>
-            <thead>
-              <tr>
-                <th>Setor</th>
-                <th style={{ textAlign: 'center' }}>Total</th>
-                <th style={{ textAlign: 'center' }}>✅ Concluídas</th>
-                <th style={{ textAlign: 'center' }}>📋 Abertas</th>
-                <th>% Conclusão</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => {
-                const pct = r.total ? Math.round((r.concluidas / r.total) * 100) : 0
-                return (
-                  <tr key={r.sector} style={{ background: i % 2 === 0 ? 'var(--s1)' : 'var(--s2)' }}>
-                    <td style={{ fontWeight: 700 }}>{r.sector}</td>
-                    <td style={{ fontFamily: 'var(--mono)', fontWeight: 600, textAlign: 'center' }}>{r.total}</td>
-                    <td style={{ color: '#10b981', fontFamily: 'var(--mono)', fontWeight: 600, textAlign: 'center' }}>{r.concluidas}</td>
-                    <td style={{ color: '#f59e0b', fontFamily: 'var(--mono)', textAlign: 'center' }}>{r.abertas}</td>
-                    <td style={{ minWidth: 130 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-                        <div style={{ flex: 1, height: 7, background: 'var(--s2)', borderRadius: 99, overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${pct}%`, background: pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444', borderRadius: 99, WebkitPrintColorAdjust:'exact', printColorAdjust:'exact' }} />
+    <div className="rep-stack">
+      <div className="dash-panel">
+        <div className="dash-panel-head"><div><div className="dash-section-title">Desempenho por setor</div><div className="dash-section-sub">Tarefas do período agrupadas por setor</div></div></div>
+        {rows.length === 0 ? (
+          <div className="empty">Nenhuma tarefa no período</div>
+        ) : (
+          <div className="rep-table-wrap">
+            <table className="rep-table">
+              <thead>
+                <tr>
+                  <th>Setor</th>
+                  <th className="num">Total</th>
+                  <th className="num">Concluídas</th>
+                  <th className="num">Abertas</th>
+                  <th>Conclusão</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(r => {
+                  const pct = r.total ? Math.round((r.concluidas / r.total) * 100) : 0
+                  const col = pct >= 80 ? COLORS.green : pct >= 50 ? COLORS.orange : COLORS.red
+                  return (
+                    <tr key={r.sector}>
+                      <td className="strong">{r.sector}</td>
+                      <td className="num">{r.total}</td>
+                      <td className="num">{r.concluidas}</td>
+                      <td className="num">{r.abertas}</td>
+                      <td className="bar-cell">
+                        <div className="bar-line">
+                          <div className="hbar-track thin"><i style={{ width: `${pct}%`, background: col }} /></div>
+                          <span>{pct}%</span>
                         </div>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', minWidth: 32, fontWeight: 700 }}>{pct}%</span>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
-          {/* Barras de volume */}
-          <div className="cfg-title" style={{ marginBottom: '.6rem' }}>Volume de tarefas por setor</div>
-          {rows.map(r => (
-            <div key={r.sector} style={{ display: 'flex', alignItems: 'center', gap: '.65rem', marginBottom: '.55rem' }}>
-              <span style={{ minWidth: 150, fontSize: '.8rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.sector}</span>
-              <div style={{ flex: 1, height: 14, background: 'var(--s2)', borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${(r.total/maxTotal)*100}%`, background: 'linear-gradient(90deg,#2563eb,#3b82f6)', borderRadius: 4, WebkitPrintColorAdjust:'exact', printColorAdjust:'exact' }} />
-              </div>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.82rem', fontWeight: 700, minWidth: 24, textAlign: 'right' }}>{r.total}</span>
-            </div>
-          ))}
-        </>
+      {rows.length > 0 && (
+        <div className="dash-panel">
+          <div className="dash-panel-head"><div><div className="dash-section-title">Volume de tarefas por setor</div><div className="dash-section-sub">Comparativo entre setores</div></div></div>
+          <HBars rows={rows.map(r => ({ label: r.sector, right: r.total, max: maxTotal, parts: [{ value: r.total, color: COLORS.navy }] }))} />
+        </div>
       )}
     </div>
   )
@@ -895,47 +706,42 @@ function ExportTab({ tasks, providers, period }) {
 
   const exportGroups = [
     {
-      title: '📄 PDF — Com logo e nome da empresa',
-      color: '#F43F5E',
+      title: 'Documentos PDF', fmt: 'PDF', sub: 'Com logo e nome da empresa',
       items: [
-        { label: 'Resumo Executivo',       desc: 'KPIs gerais, taxa de conclusão, tempo médio',              fn: exportPDF_Overview  },
-        { label: 'Todas as Tarefas',       desc: `${tasks.length} tarefas · tabela completa (landscape)`,   fn: exportPDF_Tasks     },
-        { label: 'Relatório por Colaborador',desc: `${providers.length} colaboradores com métricas de desempenho`, fn: exportPDF_Providers },
+        { label: 'Resumo executivo',          desc: 'KPIs gerais, taxa de conclusão e tempo médio',                    fn: exportPDF_Overview  },
+        { label: 'Todas as tarefas',          desc: `${tasks.length} tarefas · tabela completa em paisagem`,           fn: exportPDF_Tasks     },
+        { label: 'Relatório por colaborador', desc: `${providers.length} colaboradores com métricas de desempenho`,    fn: exportPDF_Providers },
       ]
     },
     {
-      title: '🗂️ XML — Para integração com sistemas',
-      color: 'var(--purple)',
+      title: 'Arquivo XML', fmt: 'XML', sub: 'Para integração com outros sistemas',
       items: [
-        { label: 'Exportar tarefas em XML', desc: `${tasks.length} tarefas · estrutura padronizada UTF-8`, fn: exportXML },
+        { label: 'Tarefas em XML', desc: `${tasks.length} tarefas · estrutura padronizada em UTF-8`, fn: exportXML },
       ]
     },
     {
-      title: '📊 CSV — Para Excel e planilhas',
-      color: 'var(--green)',
+      title: 'Planilhas CSV', fmt: 'CSV', sub: 'Para Excel e Google Planilhas',
       items: [
-        { label: 'Todas as tarefas',         desc: `${tasks.length} tarefas com todos os campos`, fn: dlTasks       },
-        { label: 'Tarefas concluídas',        desc: `${tasks.filter(t=>t.status==='concluida').length} tarefas concluídas`, fn: dlDone },
-        { label: 'Relatório por colaborador',   desc: `${providers.length} colaboradores com métricas`, fn: dlProviders  },
+        { label: 'Todas as tarefas',          desc: `${tasks.length} tarefas com todos os campos`, fn: dlTasks      },
+        { label: 'Tarefas concluídas',        desc: `${tasks.filter(t => t.status === 'concluida').length} tarefas concluídas`, fn: dlDone },
+        { label: 'Relatório por colaborador', desc: `${providers.length} colaboradores com métricas`, fn: dlProviders },
       ]
     },
   ]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div className="rep-stack">
       {exportGroups.map(group => (
-        <div key={group.title} className="cfg-card" style={{ borderTop: `2px solid ${group.color}` }}>
-          <div className="cfg-title" style={{ color: group.color, marginBottom: '.75rem' }}>{group.title}</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
+        <div key={group.title} className="dash-panel">
+          <div className="dash-panel-head">
+            <div><div className="dash-section-title">{group.title}</div><div className="dash-section-sub">{group.sub}</div></div>
+            <span className="rep-fmt">{group.fmt}</span>
+          </div>
+          <div className="rep-export-list">
             {group.items.map(b => (
-              <div key={b.label} className="export-row">
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: '.88rem' }}>{b.label}</div>
-                  <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginTop: '.15rem' }}>{b.desc}</div>
-                </div>
-                <button className="btn-primary" style={{ flexShrink: 0, background: group.color, border: 'none' }} onClick={b.fn}>
-                  ↓ Download
-                </button>
+              <div key={b.label} className="rep-export-row">
+                <div><b>{b.label}</b><span>{b.desc}</span></div>
+                <button className="btn-sec with-icon" onClick={b.fn}><Icon name="download" size={15} /> Baixar</button>
               </div>
             ))}
           </div>
@@ -948,10 +754,10 @@ function ExportTab({ tasks, providers, period }) {
 // ── Main Reports Component ─────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'overview',  label: '📊 Visão Geral' },
-  { id: 'providers', label: '👤 Por Colaborador' },
-  { id: 'sectors',   label: '🏢 Por Setor' },
-  { id: 'export',    label: '📤 Exportar' },
+  { id: 'overview',  label: 'Visão geral' },
+  { id: 'providers', label: 'Por colaborador' },
+  { id: 'sectors',   label: 'Por setor' },
+  { id: 'export',    label: 'Exportar' },
 ]
 
 const PERIODS = [
@@ -982,7 +788,6 @@ const STA_LABELS  = { cadastrada:'Cadastrada', pendente:'Pendente', em_andamento
 const URG_OPTIONS = ['critica','alta','media','baixa']
 const URG_LABELS  = { critica:'Crítica', alta:'Alta', media:'Média', baixa:'Baixa' }
 
-const sel = { width:'auto', padding:'.4rem .65rem', fontSize:'.82rem' }
 
 export default function Reports({ showToast }) {
   const [tab,          setTab]          = useState('overview')
@@ -1069,91 +874,70 @@ export default function Reports({ showToast }) {
         companyName={companyName}
       />
 
-      {/* ── Header da tela ── */}
-      <div className="no-print" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'.75rem', flexWrap:'wrap', gap:'.65rem' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:'.65rem' }}>
-          <img src="/logo.png" alt="DespachaApp"
-            style={{ height:28, objectFit:'contain' }}
-            onError={e => { e.target.style.display='none' }} />
-          <h2 style={{ fontFamily:'var(--mono)', fontSize:'1rem', color:'var(--blue)', letterSpacing:'.04em', margin:0 }}>
-            📊 RELATÓRIOS
-          </h2>
+      {/* ── Cabeçalho da tela ── */}
+      <div className="no-print page-head">
+        <div>
+          <h2>Relatórios</h2>
+          <p>
+            {periodLabel[period] || period} · {tasks.length} tarefa{tasks.length !== 1 ? 's' : ''}
+            {activeFilters.length > 0 && ` · ${activeFilters.join(' · ')}`}
+          </p>
         </div>
-        <div style={{ display:'flex', alignItems:'center', gap:'.5rem', flexWrap:'wrap' }}>
-          <button
-            onClick={() => window.print()}
-            style={{ padding:'.4rem .85rem', fontSize:'.82rem', background:'#0f2240', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:600 }}
-          >🖨️ Imprimir</button>
-          <span style={{ fontSize:'.78rem', color:'var(--muted)', fontFamily:'var(--mono)' }}>
-            {tasks.length} tarefa{tasks.length !== 1 ? 's' : ''}
-          </span>
-        </div>
+        <button className="btn-sec with-icon" onClick={() => window.print()}>
+          <Icon name="printer" size={16} /> Imprimir
+        </button>
       </div>
 
       {/* ── Filtros ── */}
-      <div className="no-print cfg-card" style={{ marginBottom:'1rem', display:'flex', flexWrap:'wrap', gap:'.6rem', alignItems:'center' }}>
-        {/* Período */}
-        <select className="finput" style={sel} value={period} onChange={e => setPeriod(e.target.value)}>
+      <div className="no-print ctrl-row toolbar" style={{ flexWrap: 'wrap' }}>
+        <select value={period} onChange={e => setPeriod(e.target.value)}>
           {PERIODS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
         </select>
         {period === 'mes' && (
-          <select className="finput" style={{ ...sel, minWidth: 160 }} value={monthYear} onChange={e => setMonthYear(e.target.value)}>
+          <select value={monthYear} onChange={e => setMonthYear(e.target.value)}>
             {MONTH_OPTS.map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
           </select>
         )}
         {period === 'custom' && (<>
-          <input type="date" className="finput" style={sel} value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
-          <span style={{ color:'var(--muted)', fontSize:'.82rem' }}>até</span>
-          <input type="date" className="finput" style={sel} value={customTo}   onChange={e => setCustomTo(e.target.value)} />
+          <input type="date" className="finput rep-date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
+          <span className="rep-until">até</span>
+          <input type="date" className="finput rep-date" value={customTo}   onChange={e => setCustomTo(e.target.value)} />
         </>)}
 
-        <div style={{ width:1, height:24, background:'var(--border)', flexShrink:0 }} />
+        <span className="toolbar-sep" />
 
-        {/* Setor */}
-        <select className="finput" style={sel} value={fSector} onChange={e => setFSector(e.target.value)}>
+        <select value={fSector} onChange={e => setFSector(e.target.value)}>
           <option value="">Todos os setores</option>
           {sectors.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-
-        {/* Colaborador */}
-        <select className="finput" style={sel} value={fProvider} onChange={e => setFProvider(e.target.value)}>
+        <select value={fProvider} onChange={e => setFProvider(e.target.value)}>
           <option value="">Todos os colaboradores</option>
           {providers.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
         </select>
-
-        {/* Status */}
-        <select className="finput" style={sel} value={fStatus} onChange={e => setFStatus(e.target.value)}>
+        <select value={fStatus} onChange={e => setFStatus(e.target.value)}>
           <option value="">Todos os status</option>
           {STA_OPTIONS.map(s => <option key={s} value={s}>{STA_LABELS[s]}</option>)}
         </select>
-
-        {/* Urgência */}
-        <select className="finput" style={sel} value={fUrgency} onChange={e => setFUrgency(e.target.value)}>
+        <select value={fUrgency} onChange={e => setFUrgency(e.target.value)}>
           <option value="">Todas as urgências</option>
           {URG_OPTIONS.map(u => <option key={u} value={u}>{URG_LABELS[u]}</option>)}
         </select>
 
         {hasFilter && (
-          <button onClick={clearFilters} style={{ padding:'.4rem .75rem', fontSize:'.78rem', background:'#fef2f2', color:'var(--red)', border:'1px solid #fca5a5', borderRadius:6, cursor:'pointer', fontWeight:600 }}>
-            ✕ Limpar filtros
-          </button>
+          <button className="btn-sec with-icon" onClick={clearFilters}>Limpar filtros</button>
         )}
       </div>
 
-      {/* Resumo dos filtros ativos — aparece na impressão */}
+      {/* Filtros ativos — visível também na impressão */}
       {activeFilters.length > 0 && (
-        <div style={{ fontSize:'.78rem', color:'var(--muted)', marginBottom:'.75rem', display:'flex', gap:'.5rem', flexWrap:'wrap' }}>
-          <span style={{ fontWeight:600, color:'var(--text)' }}>Filtros:</span>
-          {activeFilters.map(f => (
-            <span key={f} style={{ background:'var(--s2)', padding:'.15rem .55rem', borderRadius:20, border:'1px solid var(--border)' }}>{f}</span>
-          ))}
-          <span>· Período: {periodLabel[period] || period}</span>
-          <span>· {tasks.length} tarefa{tasks.length !== 1?'s':''}</span>
+        <div className="rep-chips print-only">
+          <span>Filtros:</span>
+          {activeFilters.map(f => <span key={f} className="chip">{f}</span>)}
         </div>
       )}
 
-      {/* ── Tabs ── */}
-      <div className="stab-bar no-print" style={{ marginBottom:'1.25rem' }}>
+      {/* ── Abas ── */}
+      <div className="stab-bar no-print">
         {TABS.map(t => (
           <button key={t.id} className={`stab${tab === t.id ? ' active' : ''}`} onClick={() => setTab(t.id)}>
             {t.label}
@@ -1161,7 +945,7 @@ export default function Reports({ showToast }) {
         ))}
       </div>
 
-      {/* ── Content ── */}
+      {/* ── Conteúdo ── */}
       {loading ? (
         <div className="empty">Carregando dados…</div>
       ) : (
