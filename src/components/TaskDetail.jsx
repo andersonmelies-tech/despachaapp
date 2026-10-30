@@ -87,8 +87,9 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
   function set(k, v) { setF(p => ({ ...p, [k]: v })) }
 
   function selectProvider(id) {
-    const p = providers.find(p => p.id === Number(id))
-    setF(prev => ({ ...prev, assignee_id: id ? Number(id) : null, assignee: p ? p.name : '' }))
+    // Compara como string — o id do prestador pode ser número ou texto (UUID)
+    const p = providers.find(p => String(p.id) === String(id))
+    setF(prev => ({ ...prev, assignee_id: id || null, assignee: p ? p.name : prev.assignee }))
   }
 
   async function addPhotos(files) {
@@ -125,9 +126,12 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
   async function save() {
     if (!f.title.trim()) return alert('Título obrigatório')
     if (!f.requester.trim()) return alert('Solicitante obrigatório')
-    if (!f.assignee.trim()) return alert('Prestador obrigatório')
+    if (!f.assignee.trim() && !f.assignee_id) return alert('Prestador obrigatório')
     if (!f.sector) return alert('Setor da tarefa obrigatório')
     setSaving(true)
+
+    // Nome do prestador pode vir vazio (ex.: recorrente só com assignee_id) — resolve pela lista
+    const assigneeNome = f.assignee.trim() || providers.find(p => String(p.id) === String(f.assignee_id))?.name || ''
 
     // ── CRIAÇÃO COM RECORRÊNCIA ──────────────────────────────────────────────
     if (!isEdit && recOn) {
@@ -144,7 +148,7 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
         requester:        f.requester.trim(),
         requester_sector: f.requester_sector || null,
         assignee_id:      f.assignee_id || null,
-        assignee:         f.assignee,
+        assignee: assigneeNome,
         urgency:          f.urgency,
         category:         f.category || null,
         sector:           f.sector   || null,
@@ -177,7 +181,7 @@ export function TaskModal({ task, providers, sectors, slaConfig, onClose, onSave
     const payload = {
       title: f.title, description: f.description,
       requester: f.requester, requester_sector: f.requester_sector,
-      assignee_id: f.assignee_id || null, assignee: f.assignee,
+      assignee_id: f.assignee_id || null, assignee: assigneeNome,
       urgency: f.urgency, status: f.status,
       category: f.category, sector: f.sector,
       due_date: resolvedDueDate,
